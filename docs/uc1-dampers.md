@@ -59,7 +59,8 @@ DAC is commanded to. A lit screen with a wrong or missing picture usually means 
 ## To check on site
 
 1. Dampers physically move (the bench had no dampers).
-2. What the FTCU does when its AIN is unpowered (see the pitfalls doc: pull-down resistor).
+2. What the FTCU does when the DAC loses power while the FTCU (24 V AC, separate supply) stays live - do the
+   unplug test in the pitfalls doc; a pull-down resistor from AIN to GND is the fix if the dampers do not close.
 3. The Q is left in **Auto** after any manual test - in a manual mode its automatic free-cooling boost
    may not engage.
 4. FTCU configured as described in the hardware doc (analogue input enabled, voltage range, angle control).

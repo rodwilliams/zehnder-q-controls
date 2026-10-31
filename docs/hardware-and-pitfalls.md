@@ -7,7 +7,7 @@
 | Controller | M5Stack **AtomS3R** | M5Stack **AtomS3** (plain) |
 | CAN interface | M5Stack **Mini CAN Unit** (TJA1051T/3) on the top Grove port | same |
 | DAC | DFRobot Gravity **GP8413** (2-channel, 15-bit, 0-10 V), I2C address **0x59** | none |
-| Loads | Lindab UltraLink **FTCU** damper controller(s), 0-10 V analogue input | none |
+| Loads | Lindab UltraLink **FTCU** damper controller(s), 0-10 V analogue input, **powered separately from 24 V AC** (not from this firmware's board or the CAN bus) | none |
 
 The Mini CAN Unit takes **12 V from the Q's CAN connector on its HV pin** and supplies 5 V to the
 Atom over the Grove cable, so the whole assembly is bus-powered.
@@ -94,8 +94,15 @@ A USB power bank was observed to give a reboot loop and poor WiFi; use a proper 
 
 ## Not yet checked on site (UC1)
 
-- Whether the FTCU treats an **unpowered** AIN as 0 V. The DAC is powered from the CAN bus, so losing
-  the CAN cable also kills the DAC output. If the AIN floats instead of reading 0 V the dampers could
-  stay open; a ~10 kohm pull-down from AIN to GND at the FTCU is the fix.
+- **What the dampers do when the DAC loses power while the FTCU stays powered.** The FTCUs run from their
+  own 24 V AC supply, independent of the ESP32. The DAC is powered from the CAN bus through the ESP32, so
+  losing the CAN cable, the Q, or the ESP32 kills the DAC output while the FTCU is still live. If the FTCU's
+  AIN then reads 0 V, the dampers close (the intended fail-safe). If AIN **floats** instead, they could drift
+  or stay open. Test it: with the system running and the dampers open, unplug the ESP32 and watch them. If
+  they do not close, a pull-down resistor from AIN to GND at the FTCU is the fix (about 10 kohm is a
+  starting point - confirm against the FTCU's input impedance in the Lindab documentation).
+- **Common reference.** The DAC's GND must be connected to the FTCU's signal ground (system neutral) so
+  the 0-10 V is measured against the right reference; with 24 V AC supplies that share a neutral, confirm
+  with a meter that the DAC GND and FTCU neutral are at the same potential before connecting the signal.
 - That the dampers physically move on the damper side (only the output voltages have been metered:
   10.004 V at fan 3, 0.0034 V at fan 2).
