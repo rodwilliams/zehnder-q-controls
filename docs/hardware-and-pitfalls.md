@@ -83,6 +83,14 @@ A USB power bank was observed to give a reboot loop and poor WiFi; use a proper 
 6. **Debug logging over serial** floods with `'Led' Setting` lines when no API client is connected;
    read logs over the network API.
 7. **FTCU wires swapped** (see Wiring).
+8. **A multimeter that read 12.6 % high.** On 2026-11-01 the DAC appeared to output 11.25 V at its 10 V
+   setting on two different DAC modules, linearly and with a slow upward creep, and the DAC's 5 V supply
+   read 5.25 V. A second, trusted meter read the same outputs as 0.02 / 2.51 / 5.04 / 7.53 / 10.06 V for
+   0 / 2.5 / 5 / 7.5 / 10 V commanded (within 0.6 %), so the DAC and firmware were correct and the first
+   meter was wrong. **Before suspecting the DAC, check the meter against a known source** (a fresh AA cell
+   reads about 1.55-1.6 V) or against a second meter. The bench test `dac_sweep_test.yaml` steps both channels
+   through 0 / 2.5 / 5 / 7.5 / 10 V, 4 s each, with the commanded voltage on the AtomS3R screen, for exactly
+   this kind of check. It replaces the UC1 firmware on the board it is flashed to.
 
 ## Not yet checked on site (UC1)
 

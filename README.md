@@ -8,6 +8,7 @@ maintained here, each on its own hardware and each built from its own top-level 
 |---|---|---|---|
 | **UC1 - free-cooling dampers** | `FreeCoolingDampers.yaml` | Output **10 V while the Q runs at fan level 3, 0 V otherwise**, to open/close Lindab UltraLink FTCU dampers. Default (boot, no data, no CAN) is closed. | AtomS3**R** + Mini CAN Unit + GP8413 DAC, status screen |
 | **UC2 - humidity boost** | `HumidityBoost.yaml` | When the Q starts overruling for humidity, **force a timed boost to fan level 3** (default 300 s) and repeat while the Q is still overruling. The Q returns itself to Auto when the timer ends. | plain AtomS3 + Mini CAN Unit, status screen |
+| Bench test | `dac_sweep_test.yaml` | Steps the DAC through 0 / 2.5 / 5 / 7.5 / 10 V (4 s each) to check the DAC and your meter. Replaces UC1 on the board. | AtomS3R + GP8413 |
 | Development | `ZehnderQAdaptor.yaml` | Impersonates the Zehnder *Option Box* to inject 0-10 V analogue inputs. **Paused**, not for production. | AtomS3R + Mini CAN + DAC |
 
 > **AtomS3 and AtomS3R are different boards** with different display pins and backlight. UC1 is built

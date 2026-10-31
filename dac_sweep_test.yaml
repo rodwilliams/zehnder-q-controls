@@ -1,0 +1,123 @@
+# BENCH TEST (AtomS3R, GP8413 on the bottom pins): steps both DAC channels through
+# 0 V, 2.5 V, 5 V, 7.5 V, 10 V, 4 seconds on each, then repeats forever. No CAN, no Q needed.
+# The screen shows the COMMANDED voltage and step so a meter reading can be matched to it.
+# Purpose: compare DAC modules / supplies (a module read 11.25 V instead of 10 V at full scale).
+# Replaces the UC1 firmware on the board it is flashed to - flash FreeCoolingDampers.yaml back afterwards.
+# Commanded value is volts/10 of the DAC's configured 10 V range: 2.5 V = 25 % of full scale, etc.
+substitutions:
+  wifi_ssid: !secret wifi_ssid
+  wifi_password: !secret wifi_password
+  wifi_hotspot_password: !secret wifi_hotspot_password
+  ota_password: !secret ota_password
+  api_encryption_key: !secret api_encryption_key
+  flash_size: 4MB
+
+packages:
+  device_base: !include upstream/boards/m5stack-atoms3.yml
+  dac: !include dac_local.yml
+  display_common: !include display_atoms3r_common_local.yml
+  display_panel: !include display_atoms3r_gc9107_local.yml
+
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [ gp8413 ]
+
+esphome:
+  name: dac-sweep-test
+  name_add_mac_suffix: true
+  friendly_name: DAC Sweep Test
+  project:
+    name: rodwilliams.dac-sweep-test
+    version: "2026.11.01"
+  on_boot:
+    - priority: -100
+      then:
+        - output.set_level: { id: dac_channel_0, level: 0.0 }
+        - output.set_level: { id: dac_channel_1, level: 0.0 }
+
+esp32:
+  board: ${board}
+  variant: ${variant}
+  flash_size: ${flash_size}
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: ${api_encryption_key}
+
+ota:
+  platform: esphome
+  password: ${ota_password}
+
+wifi:
+  ssid: ${wifi_ssid}
+  password: ${wifi_password}
+  ap:
+    password: ${wifi_hotspot_password}
+
+font:
+  - id: font_xl
+    file: fonts/DejaVuSansMono-Bold.ttf
+    size: 34
+
+globals:
+  - id: sweep_idx # 0..4 = step currently output
+    type: int
+    initial_value: "-1"
+  - id: sweep_t0 # millis() when that step started
+    type: uint32_t
+    initial_value: "0"
+  - id: sweep_loops
+    type: int
+    initial_value: "0"
+
+text_sensor:
+  - platform: template
+    id: sweep_text
+    name: "DAC Test Voltage"
+
+interval:
+  - interval: 4s
+    then:
+      - lambda: |-
+          static const float volts[5] = {0.0f, 2.5f, 5.0f, 7.5f, 10.0f};
+          int i = (id(sweep_idx) + 1) % 5;
+          if (i == 0 && id(sweep_idx) >= 0) id(sweep_loops)++;
+          id(sweep_idx) = i;
+          id(sweep_t0) = millis();
+          const float level = volts[i] / 10.0f;
+          id(dac_channel_0).set_level(level);
+          id(dac_channel_1).set_level(level);
+          char t[24];
+          snprintf(t, sizeof(t), "%.1f V (step %d/5)", volts[i], i + 1);
+          id(sweep_text).publish_state(t);
+          ESP_LOGI("sweep", "commanded %.1f V on both channels (level %.3f), loop %d", volts[i], level, id(sweep_loops) + 1);
+
+display:
+  - id: !extend lcd
+    lambda: |-
+      const Color BLACK(0, 0, 0), WHITE(255, 255, 255), GREY(140, 140, 140), AMBER(255, 170, 0), BLUE(30, 70, 170);
+      const int w = it.get_width();
+      it.fill(BLACK);
+      it.filled_rectangle(0, 0, w, 17, BLUE);
+      it.print(w / 2, 8, id(font_m), WHITE, TextAlign::CENTER, "DAC SWEEP TEST");
+      const int i = id(sweep_idx);
+      if (i < 0) {
+        it.print(w / 2, 64, id(font_m), GREY, TextAlign::CENTER, "starting...");
+        return;
+      }
+      static const float volts[5] = {0.0f, 2.5f, 5.0f, 7.5f, 10.0f};
+      it.print(w / 2, 24, id(font_s), GREY, TextAlign::TOP_CENTER, "commanded");
+      it.printf(w / 2, 62, id(font_xl), AMBER, TextAlign::CENTER, "%.1fV", volts[i]);
+      it.printf(w / 2, 94, id(font_m), WHITE, TextAlign::CENTER, "step %d of 5", i + 1);
+      // time left in this 4 s step
+      const float frac = fmin(1.0f, (millis() - id(sweep_t0)) / 4000.0f);
+      it.rectangle(8, 108, w - 16, 8, GREY);
+      it.filled_rectangle(8, 108, (int) ((w - 16) * frac), 8, AMBER);
+      it.printf(w / 2, 120, id(font_s), GREY, TextAlign::CENTER, "loop %d", id(sweep_loops) + 1);
