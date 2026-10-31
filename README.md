@@ -42,7 +42,7 @@ secrets.example.yaml                                                copy to secr
 ## Quick start
 
 ```bash
-git clone --recurse-submodules git@github.com:rodwilliams/zehnder-q-controls.git
+git clone --recurse-submodules https://github.com/rodwilliams/zehnder-q-controls.git
 cd zehnder-q-controls
 cp secrets.example.yaml secrets.yaml      # then edit it
 python3 -m venv .venv && .venv/bin/pip install esphome==2025.7.5
@@ -58,6 +58,7 @@ Full procedure, including the first USB flash, in [docs/build-flash-recover.md](
   excluded by `.gitignore` - **never commit it**.
 - **The OTA password in the current deployment is empty** (as in the upstream example), so anyone on
   the same WiFi network can reflash a board. Set `ota_password` before a deployment on a shared network.
+  How secrets, the OTA password and USB recovery work: [docs/build-flash-recover.md](docs/build-flash-recover.md#secrets-and-wireless-ota-updates).
 - The device web page has no login.
 
 ## Credits and licence

@@ -1,0 +1,35 @@
+# "Scan for docs" page for the AtomS3 / AtomS3R screens: a QR code of ${docs_url} (set in
+# documentation_local.yml). Shown (a) as the start-up splash and (b) whenever the front screen button is
+# pressed - for 60 s, or until pressed again. The screen lambdas in uc1_/uc2_status_screen_local.yml draw it.
+# The button is GPIO41 on both the AtomS3 and the AtomS3R (active low) - M5Unified, board_M5AtomS3/S3R.
+qr_code:
+  - id: info_qr
+    value: ${docs_url}
+    ecc: LOW
+
+globals:
+  - id: info_page_on
+    type: bool
+    initial_value: "false"
+  - id: info_page_start
+    type: uint32_t
+    initial_value: "0"
+
+# The button (GPIO41) is already declared as the diagnostic "Button" sensor by the upstream board file
+# (upstream/boards/m5stack-atoms3.yml), which has no id to extend and owns the pin - so we only READ the
+# pin level here, every 50 ms (which also debounces), and act on the press edge.
+interval:
+  - interval: 50ms
+    then:
+      - lambda: |-
+          static bool was_pressed = false;
+          const bool pressed = gpio_get_level(GPIO_NUM_41) == 0; // active low
+          if (pressed && !was_pressed) {
+            if (id(info_page_on) && millis() - id(info_page_start) < 60000) {
+              id(info_page_on) = false;
+            } else {
+              id(info_page_on) = true;
+              id(info_page_start) = millis();
+            }
+          }
+          was_pressed = pressed;

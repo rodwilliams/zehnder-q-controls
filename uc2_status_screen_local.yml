@@ -1,5 +1,6 @@
 # On-site status screen for system 2 (humidity boost, UC2). 128x128, redrawn once a second.
-# First 5 s after boot: a TEST CARD (edge border, colour bars). Then the live page:
+# First 6 s after boot, and for 60 s whenever the screen button is pressed (press again to hide): a QR code
+# linking to the documentation (info_page_local.yml). Then the live page:
 #
 #     [ Q HUMIDITY ]            title bar
 #     * 192.168.1.xx            WiFi dot + IP
@@ -23,16 +24,16 @@ display:
       const int h = it.get_height();
       it.fill(BLACK);
 
-      if (millis() < 5000) {
-        // ---- boot test card ----
-        it.rectangle(0, 0, w, h, WHITE);
-        it.print(w / 2, 8, id(font_m), WHITE, TextAlign::TOP_CENTER, "Q HUMIDITY");
-        it.print(w / 2, 26, id(font_s), GREY, TextAlign::TOP_CENTER, "AtomS3 display");
-        const Color bars[5] = {RED, GREEN, BLUE, WHITE, GREY};
-        for (int i = 0; i < 5; i++)
-          it.filled_rectangle(9 + i * 22, 46, 20, 36, bars[i]);
-        it.print(w / 2, 88, id(font_s), WHITE, TextAlign::TOP_CENTER, "R  G  B  W  -");
-        it.print(w / 2, 108, id(font_s), GREY, TextAlign::TOP_CENTER, "starting...");
+      const bool info_page = id(info_page_on) && (millis() - id(info_page_start) < 60000);
+      if (millis() < 6000 || info_page) {
+        // ---- QR code to the documentation (start-up splash, or button pressed) ----
+        it.fill(WHITE);
+        const int qs = id(info_qr)->get_size();
+        const int scale = (w - 24) / qs;
+        const int qw = qs * scale;
+        it.qr_code((w - qw) / 2, 10, id(info_qr), BLACK, scale);
+        it.print(w / 2, 10 + qw + 5, id(font_s), BLACK, TextAlign::TOP_CENTER, "Scan for docs");
+        it.printf(w / 2, 10 + qw + 17, id(font_s), GREY, TextAlign::TOP_CENTER, "v%s", ESPHOME_PROJECT_VERSION);
         return;
       }
 

@@ -25,6 +25,7 @@ esphome:
 
 packages:
   documentation: !include documentation_local.yml
+  info_page: !include info_page_local.yml
   base: !include base_local.yml
   device_base: !include upstream/boards/m5stack-atoms3.yml
   analogue_inputs: !include analogue_inputs_local.yml

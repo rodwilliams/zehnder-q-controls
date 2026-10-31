@@ -60,7 +60,7 @@ after changing the default in the file you must also set the number on the devic
 
 ## Status screen (plain AtomS3)
 
-5 s test card, then: WiFi dot + IP, CAN dot + signal, fan level and name, Q mode, Ventilation Mode
+QR code to this documentation for 6 s (and for 60 s whenever the screen is pressed), then: WiFi dot + IP, CAN dot + signal, fan level and name, Q mode, Ventilation Mode
 (amber while Overruling), supply flow and duty, extract/exhaust RH, and a state box at the bottom
 (green/grey watching, **amber while boosting**, red when off / no CAN / refused / chain limit).
 
