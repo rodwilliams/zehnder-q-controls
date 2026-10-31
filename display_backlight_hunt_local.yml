@@ -1,0 +1,58 @@
+# TEMPORARY bring-up: find which GPIO drives the AtomS3R LCD backlight on THIS unit.
+# Replaces display_atoms3r_common_local.yml while hunting (same spi_lcd + fonts, but no I2C
+# backlight chip, because GPIO0/GPIO45 are borrowed here as PWM outputs).
+# Three lights, each 500 Hz PWM (the rate M5Stack's docs recommend for the backlight driver),
+# all ON at boot. Toggle them from the device web page to see which one lights the screen.
+spi:
+  - id: spi_lcd
+    clk_pin: GPIO15
+    mosi_pin: GPIO21
+
+font:
+  - id: font_s
+    file: fonts/DejaVuSansMono.ttf
+    size: 11
+  - id: font_m
+    file: fonts/DejaVuSansMono-Bold.ttf
+    size: 13
+  - id: font_l
+    file: fonts/DejaVuSansMono-Bold.ttf
+    size: 18
+
+output:
+  - platform: ledc
+    id: bl_out_gpio0
+    pin:
+      number: GPIO0
+      ignore_strapping_warning: true
+    frequency: 500Hz
+  - platform: ledc
+    id: bl_out_gpio45
+    pin:
+      number: GPIO45
+      ignore_strapping_warning: true
+    frequency: 500Hz
+  - platform: ledc
+    id: bl_out_gpio16
+    pin: GPIO16
+    frequency: 500Hz
+
+light:
+  - platform: monochromatic
+    id: bl_probe_gpio0
+    name: "BL probe GPIO0"
+    output: bl_out_gpio0
+    restore_mode: ALWAYS_ON
+    default_transition_length: 0s
+  - platform: monochromatic
+    id: bl_probe_gpio45
+    name: "BL probe GPIO45"
+    output: bl_out_gpio45
+    restore_mode: ALWAYS_ON
+    default_transition_length: 0s
+  - platform: monochromatic
+    id: bl_probe_gpio16
+    name: "BL probe GPIO16"
+    output: bl_out_gpio16
+    restore_mode: ALWAYS_ON
+    default_transition_length: 0s

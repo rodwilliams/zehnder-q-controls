@@ -1,0 +1,40 @@
+# M5Stack AtomS3 (the PLAIN one, ESP32-S3FN8 - NOT the AtomS3R) 0.85" 128x128 LCD, parts common to
+# both panel variants. Pin map from M5Stack's own graphics library (M5GFX, board_M5AtomS3):
+#   SPI (write-only): MOSI GPIO21, SCLK GPIO17, DC GPIO33, CS GPIO15, RST GPIO34, mode 0
+#   Backlight: plain PWM on GPIO16 (M5GFX: _set_pwm_backlight(GPIO_NUM_16, ...)) - unlike the
+#   AtomS3R, there is no LED-driver chip on I2C.
+# The panel is GC9107 or ST7735S (M5GFX detects which by reading its ID, which write-only ESPHome
+# cannot): include display_atoms3_gc9107_local.yml first; display_atoms3_st7735_local.yml if the
+# picture is blank/garbled/colour-inverted. Provides the same ids as the AtomS3R files that the
+# status screens use: lcd, font_s, font_m, font_l.
+
+spi:
+  - id: spi_lcd
+    clk_pin: GPIO17
+    mosi_pin: GPIO21
+
+font:
+  - id: font_s
+    file: fonts/DejaVuSansMono.ttf
+    size: 11
+  - id: font_m
+    file: fonts/DejaVuSansMono-Bold.ttf
+    size: 13
+  - id: font_l
+    file: fonts/DejaVuSansMono-Bold.ttf
+    size: 18
+
+output:
+  - platform: ledc
+    id: lcd_backlight_pwm
+    pin: GPIO16
+    frequency: 1000Hz
+
+light:
+  - platform: monochromatic
+    id: lcd_backlight
+    name: "Display Backlight"
+    output: lcd_backlight_pwm
+    entity_category: config
+    restore_mode: RESTORE_DEFAULT_ON
+    default_transition_length: 0s

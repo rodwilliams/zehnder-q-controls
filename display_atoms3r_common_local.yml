@@ -1,0 +1,85 @@
+# M5Stack AtomS3R 0.85" 128x128 LCD - the parts common to both panel variants.
+# Pin map and backlight scheme taken from M5Stack's own graphics library (M5GFX, board_M5AtomS3R):
+#   SPI (write-only): MOSI GPIO21, SCLK GPIO15, DC GPIO42, CS GPIO14, RST GPIO48, mode 0
+#   Backlight: NOT a PWM pin - an LP5562-style LED driver at I2C address 0x30 on its own
+#   bus (SDA GPIO45, SCL GPIO0). It must be enabled and given a brightness or the screen stays dark.
+# The panel itself is one of two controllers (M5Stack changed supplier around 2026-05-14):
+# include display_atoms3r_gc9107_local.yml (older units) OR display_atoms3r_st7735_local.yml
+# (newer units) in the top-level config - a wrong choice gives a blank screen with no errors.
+
+spi:
+  - id: spi_lcd
+    clk_pin: GPIO15
+    mosi_pin: GPIO21
+
+i2c:
+  - id: bus_lcd
+    sda: GPIO45
+    scl: GPIO0
+    frequency: 50kHz
+    scan: true # expect 0x30 (the backlight driver) in the boot log
+
+font:
+  - id: font_s
+    file: fonts/DejaVuSansMono.ttf
+    size: 11
+  - id: font_m
+    file: fonts/DejaVuSansMono-Bold.ttf
+    size: 13
+  - id: font_l
+    file: fonts/DejaVuSansMono-Bold.ttf
+    size: 18
+
+number:
+  - platform: template
+    id: lcd_brightness
+    name: "Display Brightness"
+    icon: mdi:brightness-6
+    entity_category: config
+    optimistic: true
+    min_value: 0
+    max_value: 255
+    step: 1
+    initial_value: 120
+    restore_value: true
+    set_action:
+      - script.execute: lcd_backlight_init
+
+script:
+  # Idempotent: enable the driver chip, route the white channel to I2C control, set brightness.
+  # Safe to run repeatedly (it is re-run every 30 s so a glitched chip recovers on its own).
+  - id: lcd_backlight_init
+    mode: restart
+    then:
+      - lambda: |-
+          // i2c ErrorCode: 0 ok, 2 NACK (nothing there), 3 timeout. Logged on change only, so a
+          // silent backlight is diagnosable from the log without flooding it.
+          uint8_t en[2] = {0x00, 0x40}; // ENABLE: chip on
+          static int last_err = -1;
+          int err = (int) id(bus_lcd)->write(0x30, en, 2);
+          if (err != last_err) {
+            last_err = err;
+            ESP_LOGI("lcd", "LP5562 (0x30) enable write -> err %d (0 = ok)", err);
+          }
+      - delay: 2ms
+      - lambda: |-
+          uint8_t cfg[2] = {0x08, 0x01}; // CONFIG: internal clock
+          uint8_t map[2] = {0x70, 0x00}; // LED_MAP: all channels from I2C PWM registers
+          id(bus_lcd)->write(0x30, cfg, 2);
+          id(bus_lcd)->write(0x30, map, 2);
+          float v = id(lcd_brightness).state;
+          if (!(v >= 0.0f)) v = 120.0f; // NaN before the first restore
+          if (v > 255.0f) v = 255.0f;
+          uint8_t pwm[2] = {0x0E, (uint8_t) v}; // W_PWM: the backlight LED
+          id(bus_lcd)->write(0x30, pwm, 2);
+
+esphome:
+  on_boot:
+    - priority: -50
+      then:
+        - script.execute: lcd_backlight_init
+
+interval:
+  - interval: 30s
+    then:
+      - script.execute: lcd_backlight_init

@@ -1,0 +1,45 @@
+# AtomS3 (plain) panel variant A: GC9107 controller - CONFIRMED on this board (2026-10-31, MAC ...12:bc).
+# Init sequence copied byte-for-byte from M5Stack's M5GFX (Panel_GC9107, board_M5AtomS3: cs 15,
+# rst 34, offset_y 32):
+# (Panel_GC9107): 128x160 controller RAM, visible 128x128 window starts at row 32, no inversion.
+# ESPHome appends the pixel format, memory-access (orientation/colour order), INVOFF, SLPOUT
+# and DISPON itself. ESPHome 2025.7.5 has no GC9107 preset, hence model CUSTOM.
+display:
+  - platform: mipi_spi
+    id: lcd
+    model: CUSTOM
+    spi_id: spi_lcd
+    cs_pin: GPIO15
+    dc_pin: GPIO33
+    reset_pin: GPIO34
+    data_rate: 40MHz
+    dimensions:
+      width: 128
+      height: 128
+      offset_width: 0
+      offset_height: 32
+    color_order: rgb
+    invert_colors: false
+    update_interval: 1s
+    init_sequence:
+      - [0xFE]
+      - delay 5ms
+      - [0xEF]
+      - delay 5ms
+      - [0xB0, 0xC0]
+      - [0xB2, 0x2F]
+      - [0xB3, 0x03]
+      - [0xB6, 0x19]
+      - [0xB7, 0x01]
+      - [0xAC, 0xCB]
+      - [0xAB, 0x0E]
+      - [0xB4, 0x04]
+      - [0xA8, 0x19]
+      - [0xB8, 0x08]
+      - [0xE8, 0x24]
+      - [0xE9, 0x48]
+      - [0xEA, 0x22]
+      - [0xC6, 0x30]
+      - [0xC7, 0x18]
+      - [0xF0, 0x01, 0x2B, 0x23, 0x3C, 0xB7, 0x12, 0x17, 0x60, 0x00, 0x06, 0x0C, 0x17, 0x12, 0x1F]
+      - [0xF1, 0x05, 0x2E, 0x2D, 0x44, 0xD6, 0x15, 0x17, 0xA0, 0x02, 0x0D, 0x0D, 0x1A, 0x18, 0x1F]

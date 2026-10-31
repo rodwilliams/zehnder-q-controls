@@ -1,0 +1,22 @@
+Zehnder Q controls
+Copyright (C) 2025-2026 Rod Williams
+
+This project is a derivative work. It includes and modifies material from:
+
+  yoziru/esphome-zehnder-comfoair  (GPL-3.0)
+  https://github.com/yoziru/esphome-zehnder-comfoair
+  Pinned as a git submodule in ./upstream (commit 68ad3d1, 2025-08-19). Our modified copy of its
+  ESPHome component is in components/zehnder_comfoair_q/, and base_local.yml / canbus_local.yml are
+  adapted from its packages.
+
+That project in turn relies on the ComfoNet protocol documentation and reverse engineering by:
+
+  michaelarnauts/aiocomfoconnect
+  https://github.com/michaelarnauts/aiocomfoconnect  (docs/PROTOCOL-PDO.md)
+
+Screen drivers use pin maps and panel initialisation sequences read from M5Stack's M5GFX library
+(MIT) - https://github.com/m5stack/M5GFX. Fonts in fonts/ are DejaVu Sans Mono (Bitstream Vera /
+public-domain-like licence, see https://dejavu-fonts.github.io/License.html).
+
+Because GPL-3.0 material is included, this repository as a whole is distributed under GPL-3.0
+(see LICENSE).

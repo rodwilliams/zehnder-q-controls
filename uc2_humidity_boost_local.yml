@@ -1,0 +1,145 @@
+# UC2 (system 2, humidity boost): while the Q's own humidity control is overruling the
+# ventilation, hold fan level 3 in timed boosts, and re-boost for as long as it keeps overruling.
+#
+# EVIDENCE (kettle recordings 2026-10-28):
+#   - humidity modulation is NOT visible in fan level or operating mode (Medium / Auto throughout);
+#     the marker is "Ventilation Mode" (PDO 225) == Overruling.
+#   - our boost is accepted from this node: Operating Mode -> Boost, Fan Level -> High, same second.
+#     While boosting, Ventilation Mode was reported as "Disabled" in two boosts but stayed
+#     "Overruling" the whole time in a third, so it is NOT a reliable signal during a boost - this
+#     logic therefore only reads it once the boost has ended (Q back in Auto).
+#   - the Q's own timer ends the boost on time (Boost -> Auto, High -> Medium, Disabled -> Active
+#     in the same second) and the flow settles back to baseline within ~40 s.
+#
+# BEHAVIOUR:
+#   Q in Auto, below fan 3, CAN alive, Ventilation Mode == Overruling  -> send a timed boost
+#   boost ends (Q leaves Boost)  -> wait uc2_settle_s, look again; still Overruling -> boost again
+#   Ventilation Mode back to Active in Auto -> the episode is over, the chain counter resets
+#
+# SAFEGUARDS (it acts on a real unit):
+#   - never over the user's manual / away / boost choice (acts only in Auto), never at fan 3
+#   - the timer lives in the Q: if this ESP32 dies mid-boost the Q still returns to Auto itself
+#   - at most uc2_max_chain boosts in a row without the Q reporting Active in between (a runaway
+#     guard if "Overruling" ever got stuck for some other reason)
+#   - if the Q has not gone into Boost 15 s after we sent it, we stop, log it, and pause 60 s
+#   - master switch "Humidity Boost Enabled" (restores its last state; default ON); duration is the
+#     number "Humidity Boost Duration" (seconds, remembered across reboots)
+substitutions:
+  uc2_bus_timeout_ms: "30000" # the Q heartbeats every ~2 s
+  uc2_settle_s: "5" # pause after a boost ends before looking at Ventilation Mode again
+  uc2_max_chain: "6" # max boosts in a row without the Q reporting Active in between
+
+switch:
+  - platform: template
+    id: uc2_enabled
+    name: "Humidity Boost Enabled"
+    icon: mdi:water-percent
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+number:
+  - platform: template
+    id: uc2_duration
+    name: "Humidity Boost Duration"
+    icon: mdi:timer-outline
+    entity_category: config
+    unit_of_measurement: "s"
+    optimistic: true
+    min_value: 30
+    max_value: 1800
+    step: 30
+    initial_value: 300
+    restore_value: true
+
+text_sensor:
+  - platform: template
+    id: uc2_state
+    name: "Humidity Boost State"
+    icon: mdi:water-alert
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          static int st = 0;            // 0 = watching, 1 = boost running, 2 = paused after a refused boost
+          static uint32_t t_start = 0;  // when we sent the boost
+          static uint32_t t_gate = 0;   // no new boost before this time
+          static bool saw_boost = false;
+          static int chain = 0;
+          static std::string last_text;
+
+          const std::string vm = id(ventilation_mode).state;
+          const std::string om = id(operating_mode).state;
+          const float lvl = id(fan_level_raw).state;
+          const int lvl_i = isnan(lvl) ? -1 : (int) lvl;
+          const bool alive = id(comfoair)->bus_alive(${uc2_bus_timeout_ms});
+          const bool enabled = id(uc2_enabled).state;
+          const uint32_t now = millis();
+          const float d = id(uc2_duration).state;
+          const uint32_t dur_s = (d >= 30.0f) ? (uint32_t) d : 120;
+          const uint32_t gate_ms = ${uc2_settle_s} * 1000UL;
+
+          char text[40];
+          snprintf(text, sizeof(text), "Idle - watching");
+
+          if (st == 1) {
+            const uint32_t el = (now - t_start) / 1000;
+            if (om == "Boost") saw_boost = true;
+            if (saw_boost && om != "Boost") {
+              st = 0;
+              t_gate = now + gate_ms;
+              ESP_LOGI("uc2", "boost ended after %u s: Q mode '%s', ventilation '%s', fan level %d, supply %.0f m3/h",
+                       (unsigned) el, om.c_str(), vm.c_str(), lvl_i, id(supply_fan_flow).state);
+            } else if (!saw_boost && el >= 15) {
+              st = 2;
+              t_gate = now + 60000UL;
+              ESP_LOGW("uc2", "boost NOT accepted: 15 s after sending, Q mode is '%s', fan level %d - pausing 60 s",
+                       om.c_str(), lvl_i);
+            } else if (el >= dur_s + 30) {
+              st = 0;
+              t_gate = now + gate_ms;
+              ESP_LOGW("uc2", "boost window timed out (Q mode '%s', ventilation '%s')", om.c_str(), vm.c_str());
+            } else {
+              snprintf(text, sizeof(text), "Boost %d s left", (int) (((dur_s > el ? dur_s - el : 0) + 5) / 10 * 10));
+            }
+          }
+          if (st == 2) {
+            if (now >= t_gate) st = 0;
+            else snprintf(text, sizeof(text), "Refused - pausing");
+          }
+          if (st == 0) {
+            if (!enabled) {
+              snprintf(text, sizeof(text), "Off (switch)");
+            } else if (!alive) {
+              snprintf(text, sizeof(text), "No CAN bus");
+            } else {
+              if (vm == "Active" && om == "Auto") {
+                if (chain > 0) ESP_LOGI("uc2", "ventilation back to Active in Auto: humidity episode over after %d boost(s)", chain);
+                chain = 0;
+              }
+              if (vm == "Overruling") {
+                if (om != "Auto") {
+                  snprintf(text, sizeof(text), "Not Auto - skip");
+                } else if (lvl_i == 3) {
+                  snprintf(text, sizeof(text), "At fan 3 - skip");
+                } else if (now < t_gate) {
+                  snprintf(text, sizeof(text), "Settling...");
+                } else if (chain >= ${uc2_max_chain}) {
+                  snprintf(text, sizeof(text), "Chain limit hit");
+                } else {
+                  chain++;
+                  ESP_LOGI("uc2", "ventilation Overruling in Auto at fan level %d, supply %.0f m3/h -> BOOST %u s (boost %d of max %d in this episode)",
+                           lvl_i, id(supply_fan_flow).state, (unsigned) dur_s, chain, ${uc2_max_chain});
+                  id(comfoair)->set_boost(dur_s);
+                  st = 1;
+                  t_start = now;
+                  saw_boost = false;
+                  snprintf(text, sizeof(text), "Boost sent %u s", (unsigned) dur_s);
+                }
+              }
+            }
+          }
+          if (last_text != text) {
+            last_text = text;
+            id(uc2_state).publish_state(text);
+          }

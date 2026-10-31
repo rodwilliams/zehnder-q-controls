@@ -1,0 +1,15 @@
+# Makes every firmware point to its own documentation: a "Documentation" entry on the device's web
+# page / API (diagnostic), carrying the repository address. Include in each top-level project file.
+# (The same address is meant to be shown as a QR code on the status screen and on a label on the
+# enclosure - see docs/ in the repository.)
+substitutions:
+  docs_url: https://github.com/rodwilliams/zehnder-q-controls
+
+text_sensor:
+  - platform: template
+    id: documentation_url
+    name: "Documentation"
+    icon: mdi:book-open-variant
+    entity_category: diagnostic
+    lambda: |-
+      return std::string("${docs_url}");

@@ -1,0 +1,113 @@
+# Option Box impersonation test controls.
+# SAFETY: only turn "Option Box Impersonation" on once the real Option Box is physically
+# disconnected from the ComfoNet bus - two nodes broadcasting PDO 515/516 will collide.
+# Defaults to OFF on every boot so a reboot never silently starts broadcasting.
+# All entity names are prefixed "Option Box: " so they sort/group apart from the regular
+# Q450 controls without needing any web_server config changes.
+
+switch:
+  - platform: template
+    name: "Option Box: Impersonation"
+    id: option_box_impersonation
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    turn_on_action:
+      - lambda: id(comfoair).start_impersonation();
+    turn_off_action:
+      - lambda: id(comfoair).stop_impersonation();
+
+number:
+  - platform: template
+    name: "Option Box: V1 (Analogue Input 1)"
+    id: v1_volts
+    optimistic: true
+    unit_of_measurement: "V"
+    min_value: 0
+    max_value: 10
+    step: 0.1
+    initial_value: 0
+    restore_value: false
+    set_action:
+      - lambda: id(comfoair).set_analog_input_volts(1, x);
+      - lambda: id(dac_channel_0).set_level(x / 10.0f);
+  - platform: template
+    name: "Option Box: V2 (Analogue Input 2)"
+    id: v2_volts
+    optimistic: true
+    unit_of_measurement: "V"
+    min_value: 0
+    max_value: 10
+    step: 0.1
+    initial_value: 0
+    restore_value: false
+    set_action:
+      - lambda: id(comfoair).set_analog_input_volts(2, x);
+      - lambda: id(dac_channel_1).set_level(x / 10.0f);
+  - platform: template
+    name: "Option Box: V1 Raw (Analogue Input 1)"
+    id: v1_raw
+    optimistic: true
+    min_value: 0
+    max_value: 65535
+    step: 1
+    initial_value: 0
+    restore_value: false
+    set_action:
+      - lambda: id(comfoair).set_analog_input_raw(1, (uint16_t) x);
+  - platform: template
+    name: "Option Box: V2 Raw (Analogue Input 2)"
+    id: v2_raw
+    optimistic: true
+    min_value: 0
+    max_value: 65535
+    step: 1
+    initial_value: 0
+    restore_value: false
+    set_action:
+      - lambda: id(comfoair).set_analog_input_raw(2, (uint16_t) x);
+  - platform: template
+    name: "Option Box: V3 (Analogue Input 3)"
+    id: v3_volts
+    optimistic: true
+    unit_of_measurement: "V"
+    min_value: 0
+    max_value: 10
+    step: 0.1
+    initial_value: 0
+    restore_value: false
+    set_action:
+      - lambda: id(comfoair).set_analog_input_volts(3, x);
+  - platform: template
+    name: "Option Box: V4 (Analogue Input 4)"
+    id: v4_volts
+    optimistic: true
+    unit_of_measurement: "V"
+    min_value: 0
+    max_value: 10
+    step: 0.1
+    initial_value: 0
+    restore_value: false
+    set_action:
+      - lambda: id(comfoair).set_analog_input_volts(4, x);
+  - platform: template
+    name: "Option Box: V3 Raw (Analogue Input 3)"
+    id: v3_raw
+    optimistic: true
+    min_value: 0
+    max_value: 65535
+    step: 1
+    initial_value: 0
+    restore_value: false
+    set_action:
+      - lambda: id(comfoair).set_analog_input_raw(3, (uint16_t) x);
+  - platform: template
+    name: "Option Box: V4 Raw (Analogue Input 4)"
+    id: v4_raw
+    optimistic: true
+    min_value: 0
+    max_value: 65535
+    step: 1
+    initial_value: 0
+    restore_value: false
+    set_action:
+      - lambda: id(comfoair).set_analog_input_raw(4, (uint16_t) x);

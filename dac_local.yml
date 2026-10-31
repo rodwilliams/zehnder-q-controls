@@ -1,0 +1,28 @@
+# GP8413 2-channel 15-bit I2C-to-0-10V DAC, wired separately from the CAN Grove port
+# (GPIO1/GPIO2 are already used by the CAN transceiver).
+# NOTE: SDA=GPIO38, SCL=GPIO39 - confirmed by live bus scan 2026-08-08. M5Stack's own docs
+# label these "SYS_SCL"/"SYS_SDA" in the opposite order, which sent this in circles for a while.
+# The bus has an id because the AtomS3R's LCD backlight chip lives on a second I2C bus
+# (display_atoms3r_*_local.yml); with two buses every device must name its bus.
+i2c:
+  - id: bus_dac
+    sda: GPIO38
+    scl: GPIO39
+    frequency: 10kHz
+    scan: true
+
+gp8413:
+  id: gp8413_dac
+  i2c_id: bus_dac
+  address: 0x59
+  voltage: 10V
+
+output:
+  - platform: gp8413
+    id: dac_channel_0
+    gp8413_id: gp8413_dac
+    channel: 0
+  - platform: gp8413
+    id: dac_channel_1
+    gp8413_id: gp8413_dac
+    channel: 1

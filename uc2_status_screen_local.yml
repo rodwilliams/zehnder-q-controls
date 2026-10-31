@@ -1,0 +1,87 @@
+# On-site status screen for system 2 (humidity boost, UC2). 128x128, redrawn once a second.
+# First 5 s after boot: a TEST CARD (edge border, colour bars). Then the live page:
+#
+#     [ Q HUMIDITY ]            title bar
+#     * 192.168.1.xx            WiFi dot + IP
+#     * CAN ok  -52dBm          CAN dot (green = bus traffic) + WiFi signal as the ESP32 sees it
+#     Fan  Medium (2)           fan level reported by the Q
+#     Mode Auto                 Q operating mode
+#     Vent Active               ventilation mode (Overruling = the Q's humidity control acting)
+#     Flow 151 m3/h 27%         supply flow + fan duty
+#     RH   50/49 %              extract / exhaust humidity
+#     [ Idle - watching ]       UC2 state: grey/green = watching, AMBER = boost running,
+#                               RED = switched off / no CAN
+#
+# Needs display_atoms3r_common_local.yml + a panel file (id: lcd), the generated sensors and
+# uc2_humidity_boost_local.yml (ids uc2_state, and the substitution uc2_bus_timeout_ms).
+display:
+  - id: !extend lcd
+    lambda: |-
+      const Color BLACK(0, 0, 0), WHITE(255, 255, 255), GREY(140, 140, 140);
+      const Color RED(220, 40, 40), GREEN(0, 190, 60), BLUE(30, 70, 170), AMBER(255, 170, 0), DKGREEN(0, 100, 40);
+      const int w = it.get_width();
+      const int h = it.get_height();
+      it.fill(BLACK);
+
+      if (millis() < 5000) {
+        // ---- boot test card ----
+        it.rectangle(0, 0, w, h, WHITE);
+        it.print(w / 2, 8, id(font_m), WHITE, TextAlign::TOP_CENTER, "Q HUMIDITY");
+        it.print(w / 2, 26, id(font_s), GREY, TextAlign::TOP_CENTER, "AtomS3 display");
+        const Color bars[5] = {RED, GREEN, BLUE, WHITE, GREY};
+        for (int i = 0; i < 5; i++)
+          it.filled_rectangle(9 + i * 22, 46, 20, 36, bars[i]);
+        it.print(w / 2, 88, id(font_s), WHITE, TextAlign::TOP_CENTER, "R  G  B  W  -");
+        it.print(w / 2, 108, id(font_s), GREY, TextAlign::TOP_CENTER, "starting...");
+        return;
+      }
+
+      // ---- live status ----
+      const bool wifi_ok = wifi::global_wifi_component->is_connected();
+      const bool can_ok = id(comfoair)->bus_alive(${uc2_bus_timeout_ms});
+      const float level = id(fan_level_raw).state;
+      const float flow = id(supply_fan_flow).state;
+      const float duty = id(supply_fan_duty).state;
+      const float rh_e = id(extract_air_humidity).state;
+      const float rh_x = id(exhaust_air_humidity).state;
+      const std::string vent = id(ventilation_mode).state;
+
+      it.filled_rectangle(0, 0, w, 17, BLUE);
+      it.print(w / 2, 8, id(font_m), WHITE, TextAlign::CENTER, "Q HUMIDITY");
+
+      it.filled_circle(6, 26, 4, wifi_ok ? GREEN : RED);
+      if (wifi_ok)
+        it.printf(14, 20, id(font_s), WHITE, "%s", wifi::global_wifi_component->get_ip_addresses()[0].str().c_str());
+      else
+        it.print(14, 20, id(font_s), RED, "WiFi down");
+
+      it.filled_circle(6, 39, 4, can_ok ? GREEN : RED);
+      if (can_ok)
+        it.printf(14, 33, id(font_s), WHITE, "CAN ok %ddBm", wifi_ok ? (int) wifi::global_wifi_component->wifi_rssi() : 0);
+      else
+        it.print(14, 33, id(font_s), RED, "CAN: no bus");
+
+      if (isnan(level))
+        it.print(2, 46, id(font_s), AMBER, "Fan  ?");
+      else
+        it.printf(2, 46, id(font_s), WHITE, "Fan  %s (%d)", id(fan_level).state.c_str(), (int) level);
+      it.printf(2, 59, id(font_s), GREY, "Mode %s", id(operating_mode).state.c_str());
+      it.printf(2, 72, id(font_s), vent == "Overruling" ? AMBER : GREY, "Vent %s", vent.c_str());
+      if (isnan(flow))
+        it.print(2, 85, id(font_s), GREY, "Flow --");
+      else if (isnan(duty))
+        it.printf(2, 85, id(font_s), WHITE, "Flow %.0f m3/h", flow);
+      else
+        it.printf(2, 85, id(font_s), WHITE, "Flow %.0f m3/h %.0f%%", flow, duty);
+      if (isnan(rh_e) || isnan(rh_x))
+        it.print(2, 98, id(font_s), GREY, "RH   --");
+      else
+        it.printf(2, 98, id(font_s), WHITE, "RH   %.0f/%.0f %%", rh_e, rh_x);
+
+      // UC2 state box
+      const std::string s = id(uc2_state).state;
+      Color bg = DKGREEN, fg = WHITE;
+      if (s.rfind("Boost", 0) == 0) { bg = AMBER; fg = BLACK; }
+      else if (s.rfind("Off", 0) == 0 || s.rfind("No CAN", 0) == 0 || s.rfind("Refused", 0) == 0 || s.rfind("Chain", 0) == 0) { bg = RED; fg = WHITE; }
+      it.filled_rectangle(0, 111, w, h - 111, bg);
+      it.printf(w / 2, 111 + (h - 111) / 2, id(font_s), fg, TextAlign::CENTER, "%s", s.c_str());

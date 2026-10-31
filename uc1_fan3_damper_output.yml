@@ -1,0 +1,93 @@
+# UC1 (system 1, free-cooling dampers): DAC channel 0 follows the Q's fan level.
+#
+#   fan level 3 (High)            -> 10 V  (dampers open)
+#   fan level 0/1/2               ->  0 V  (dampers closed)
+#   anything unknown              ->  0 V  (closed is the safe default):
+#       - just booted / fan level not yet reported by the Q
+#       - no CAN traffic for uc1_bus_timeout_ms (Q off, cable out, bus fault)
+#
+# No hysteresis or run-on, on purpose: the dampers' own travel time (tens of seconds) already
+# smooths any short 2<->3 flicker. The Q is configured by the user to auto-boost to level 3 for
+# free cooling, so "level 3" is also exactly what a manual fan-3 looks like (intended: it protects
+# the standard ducts from the full flow regardless of why the Q is at level 3).
+#
+# Needs: components zehnder_comfoair_q + gp8413, dac_local.yml (output dac_channel_0/1), and the
+# generated fan_level_raw sensor (PDO 65). Does NOT use Option Box impersonation.
+
+substitutions:
+  uc1_bus_timeout_ms: "30000" # the Q heartbeats every ~2 s; the Q itself raises "check cables" after ~30 s
+
+esphome:
+  on_boot:
+    - priority: -100 # after everything else is up
+      then:
+        # Known state straight away: both DAC channels 0 V. (The DAC keeps its last value across an ESP32
+        # reset because it stays powered, so this also covers a reboot while the dampers were open.)
+        - output.set_level: { id: dac_channel_0, level: 0.0 }
+        - output.set_level: { id: dac_channel_1, level: 0.0 }
+
+binary_sensor:
+  - platform: template
+    id: dampers_open
+    name: "Dampers Open"
+    device_class: opening
+
+text_sensor:
+  - platform: template
+    id: damper_control_state
+    name: "Damper Control State"
+    icon: mdi:valve
+
+interval:
+  # Evaluate once a second and re-assert the DAC every 5 s even if nothing changed (self-heals a
+  # glitched I2C write). Response is well inside the dampers' travel time.
+  - interval: 1s
+    then:
+      - lambda: |-
+          const float level = id(fan_level_raw).state; // NaN until the Q has reported PDO 65
+          const bool alive = id(comfoair)->bus_alive(${uc1_bus_timeout_ms});
+          static bool was_alive = false;
+          static int last_cmd = -1; // -1 = nothing commanded yet
+          static uint32_t last_write_ms = 0;
+          static std::string last_state;
+
+          // Bus just came back: the Q may have restarted and forgotten us, so ask for the level again.
+          if (alive && !was_alive)
+            id(comfoair)->request_pdo(65);
+          was_alive = alive;
+
+          bool open = false;
+          char state[48];
+          if (!alive) {
+            snprintf(state, sizeof(state), "Closed - no CAN bus activity");
+          } else if (std::isnan(level)) {
+            snprintf(state, sizeof(state), "Closed - waiting for fan level");
+          } else if ((int) level == 3) {
+            open = true;
+            snprintf(state, sizeof(state), "Open - fan level 3");
+          } else {
+            snprintf(state, sizeof(state), "Closed - fan level %d", (int) level);
+          }
+
+          const bool changed = ((int) open != last_cmd);
+          if (changed || millis() - last_write_ms >= 5000) {
+            id(dac_channel_0).set_level(open ? 1.0f : 0.0f);
+            last_write_ms = millis();
+          }
+          if (changed) {
+            ESP_LOGI("uc1", "Damper output %s (%s)", open ? "10 V" : "0 V", state);
+            last_cmd = open;
+            id(dampers_open).publish_state(open);
+          }
+          if (last_state != state) {
+            last_state = state;
+            id(damper_control_state).publish_state(state);
+          }
+
+  # Don't rely on the Q pushing level changes after a subscription we made once: ask for the fan
+  # level every minute (a single RTR frame). Cheap, and the level can't go stale for long.
+  - interval: 60s
+    then:
+      - lambda: |-
+          if (id(comfoair)->bus_alive(${uc1_bus_timeout_ms}))
+            id(comfoair)->request_pdo(65);

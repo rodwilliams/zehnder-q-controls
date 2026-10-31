@@ -1,0 +1,17 @@
+# Secrets - never commit. See secrets.example.yaml for the keys needed.
+/secrets.yaml
+
+# ESPHome build output and downloaded packages (rebuilt automatically; ~1 GB)
+/.esphome/
+
+# Captured data and device images: large, and the stock-firmware dumps can contain the
+# previous owner's WiFi/cloud settings. Keep them locally / on backup storage.
+/recordings/
+/backups/
+
+# Logs from bench sessions, Python caches, editor files
+*.log
+__pycache__/
+*.pyc
+.vscode/
+.idea/

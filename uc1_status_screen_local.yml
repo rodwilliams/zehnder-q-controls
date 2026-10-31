@@ -1,0 +1,75 @@
+# On-site status screen for system 1 (free-cooling dampers). 128x128, redrawn once a second.
+#
+#   First 5 s after boot: a TEST CARD - 1 px border on the very edge of the panel, colour bars
+#   (R G B W grey) and text - so a wrong panel variant / colour order / orientation / offset is
+#   obvious immediately. Then the live status page:
+#
+#     [ Q DAMPERS ]              title bar
+#     * 192.168.1.53             WiFi dot (green = connected) + IP
+#       -71 dBm                  signal strength as the ESP32 sees it
+#     * CAN ok                   CAN dot (green = bus traffic within uc1_bus_timeout_ms)
+#     Fan  Medium (2)            fan level as reported by the Q
+#     Auto                       Q operating mode (Auto / Manual (limited) / Boost ...)
+#     Flow 150 m3/h              supply flow
+#     [ CLOSED 0V ]  or  [ OPEN 10V ]     the damper output the DAC is commanded to
+#
+# Needs: display_atoms3r_common_local.yml + one panel file (id: lcd), uc1_fan3_damper_output.yml
+# (ids dampers_open, fan_level_raw via generated packages) and the generated text sensors.
+display:
+  - id: !extend lcd
+    lambda: |-
+      const Color BLACK(0, 0, 0), WHITE(255, 255, 255), GREY(140, 140, 140);
+      const Color RED(230, 40, 40), GREEN(0, 190, 60), BLUE(30, 70, 170), AMBER(255, 170, 0);
+      const int w = it.get_width();
+      const int h = it.get_height();
+      it.fill(BLACK);
+
+      if (millis() < 5000) {
+        // ---- boot test card ----
+        it.rectangle(0, 0, w, h, WHITE);        // must sit exactly on the panel edge
+        it.print(w / 2, 8, id(font_m), WHITE, TextAlign::TOP_CENTER, "Q DAMPERS");
+        it.print(w / 2, 26, id(font_s), GREY, TextAlign::TOP_CENTER, "AtomS3R display");
+        const Color bars[5] = {RED, GREEN, BLUE, WHITE, GREY};
+        for (int i = 0; i < 5; i++)
+          it.filled_rectangle(9 + i * 22, 46, 20, 36, bars[i]);
+        it.print(w / 2, 88, id(font_s), WHITE, TextAlign::TOP_CENTER, "R  G  B  W  -");
+        it.print(w / 2, 108, id(font_s), GREY, TextAlign::TOP_CENTER, "starting...");
+        return;
+      }
+
+      // ---- live status ----
+      const bool wifi_ok = wifi::global_wifi_component->is_connected();
+      const bool can_ok = id(comfoair)->bus_alive(${uc1_bus_timeout_ms});
+      const bool open = id(dampers_open).has_state() && id(dampers_open).state;
+      const float level = id(fan_level_raw).state;
+      const float flow = id(supply_fan_flow).state;
+
+      it.filled_rectangle(0, 0, w, 17, BLUE);
+      it.print(w / 2, 8, id(font_m), WHITE, TextAlign::CENTER, "Q DAMPERS");
+
+      it.filled_circle(6, 26, 4, wifi_ok ? GREEN : RED);
+      if (wifi_ok) {
+        it.printf(14, 20, id(font_s), WHITE, "%s", wifi::global_wifi_component->get_ip_addresses()[0].str().c_str());
+        it.printf(14, 33, id(font_s), GREY, "%d dBm", (int) wifi::global_wifi_component->wifi_rssi());
+      } else {
+        it.print(14, 20, id(font_s), RED, "WiFi down");
+      }
+
+      it.filled_circle(6, 52, 4, can_ok ? GREEN : RED);
+      it.print(14, 46, id(font_s), can_ok ? WHITE : RED, can_ok ? "CAN ok" : "CAN: no bus");
+
+      if (isnan(level)) {
+        it.print(2, 59, id(font_s), AMBER, "Fan  ?");
+      } else {
+        it.printf(2, 59, id(font_s), WHITE, "Fan  %s (%d)", id(fan_level).state.c_str(), (int) level);
+      }
+      it.printf(2, 72, id(font_s), GREY, "%s", id(operating_mode).state.c_str());
+      if (isnan(flow)) {
+        it.print(2, 85, id(font_s), GREY, "Flow --");
+      } else {
+        it.printf(2, 85, id(font_s), WHITE, "Flow %.0f m3/h", flow);
+      }
+
+      // the output the dampers are being driven with (DAC channel 0)
+      it.filled_rectangle(0, 101, w, h - 101, open ? AMBER : GREEN);
+      it.print(w / 2, 101 + (h - 101) / 2, id(font_l), BLACK, TextAlign::CENTER, open ? "OPEN 10V" : "CLOSED 0V");

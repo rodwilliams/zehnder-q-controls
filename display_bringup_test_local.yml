@@ -1,0 +1,30 @@
+# TEMPORARY bring-up screen: cycles through unmistakable full-screen test patterns, 3 s each,
+# so the panel variant / backlight / colour order / geometry can be judged by eye.
+#   WHITE -> RED -> GREEN -> BLUE -> black with white border + cross -> (repeat)
+# Swap this in place of uc1_status_screen_local.yml in the top-level config while debugging.
+display:
+  - id: !extend lcd
+    lambda: |-
+      const int w = it.get_width();
+      const int h = it.get_height();
+      const uint32_t phase = (millis() / 3000) % 5;
+      static uint32_t last_phase = 99;
+      if (phase != last_phase) {
+        last_phase = phase;
+        ESP_LOGI("lcd", "test pattern phase %d", (int) phase);
+      }
+      const Color WHITE(255, 255, 255), BLACK(0, 0, 0);
+      const Color fills[4] = {WHITE, Color(255, 0, 0), Color(0, 255, 0), Color(0, 0, 255)};
+      const char *names[4] = {"WHITE", "RED", "GREEN", "BLUE"};
+      if (phase < 4) {
+        it.fill(fills[phase]);
+        const Color ink = (phase == 0 || phase == 2) ? BLACK : WHITE;
+        it.rectangle(0, 0, w, h, ink);
+        it.print(w / 2, h / 2, id(font_l), ink, TextAlign::CENTER, names[phase]);
+      } else {
+        it.fill(BLACK);
+        it.rectangle(0, 0, w, h, WHITE);
+        it.line(0, 0, w - 1, h - 1, WHITE);
+        it.line(w - 1, 0, 0, h - 1, WHITE);
+        it.print(w / 2, 14, id(font_m), WHITE, TextAlign::CENTER, "BORDER+X");
+      }

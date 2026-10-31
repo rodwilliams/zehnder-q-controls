@@ -1,0 +1,39 @@
+# Q's rebroadcast of its four analogue inputs (PDO 369-372, 1-byte, x0.1 -> volts).
+# canbus_local.yml publishes into these ids, so every project that includes canbus_local.yml
+# needs this file. On a machine with no Option Box they simply read 0 V.
+sensor:
+  - platform: template
+    id: analogue_input_1
+    name: "Analogue Input 1"
+    accuracy_decimals: 2
+    unit_of_measurement: "V"
+    state_class: measurement
+    filters:
+      - multiply: 0.1
+
+  - platform: template
+    id: analogue_input_2
+    name: "Analogue Input 2"
+    accuracy_decimals: 2
+    unit_of_measurement: "V"
+    state_class: measurement
+    filters:
+      - multiply: 0.1
+
+  - platform: template
+    id: analogue_input_3
+    name: "Analogue Input 3"
+    accuracy_decimals: 2
+    unit_of_measurement: "V"
+    state_class: measurement
+    filters:
+      - multiply: 0.1
+
+  - platform: template
+    id: analogue_input_4
+    name: "Analogue Input 4"
+    accuracy_decimals: 2
+    unit_of_measurement: "V"
+    state_class: measurement
+    filters:
+      - multiply: 0.1
