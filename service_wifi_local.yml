@@ -1,0 +1,59 @@
+# WiFi "service mode" for deployments that are NOT on the site network (security: nothing is reachable
+# at the site while the unit is just doing its job).
+#
+#   - The WiFi radio is OFF at boot. The control logic (damper output / humidity boost) does not need it.
+#   - HOLD the screen button for ${service_wifi_hold_ms} ms to switch WiFi on for ${service_wifi_minutes} minutes
+#     (hold again to switch it off sooner). It joins the network named in secrets.yaml (bring that network
+#     with you), or - if it cannot - offers its own fallback hotspot, as documented in docs/build-flash-recover.md.
+#     After the time is up WiFi switches itself off again.
+#   - Neither the WiFi nor the API reboots the board when there is no network. (ESPHome's defaults reboot after
+#     15 minutes without a connection; for the damper controller every reboot drops the output to 0 V.)
+#
+# The long-press detection lives in info_page_local.yml (the same button), so include BOTH files together.
+# A WiFi update that is still running when the time is up fails safely: the old firmware stays in place.
+substitutions:
+  service_wifi_minutes: "15"
+  service_wifi_hold_ms: "2500"
+
+wifi:
+  enable_on_boot: false
+  reboot_timeout: 0s
+
+api:
+  reboot_timeout: 0s
+
+globals:
+  - id: service_wifi_on
+    type: bool
+    initial_value: "false"
+  - id: service_wifi_start
+    type: uint32_t
+    initial_value: "0"
+
+script:
+  - id: service_wifi_toggle
+    mode: single
+    then:
+      - if:
+          condition:
+            lambda: 'return id(service_wifi_on);'
+          then:
+            - lambda: |-
+                id(service_wifi_on) = false;
+                ESP_LOGI("service_wifi", "WiFi service mode OFF");
+            - wifi.disable:
+          else:
+            - lambda: |-
+                id(service_wifi_on) = true;
+                id(service_wifi_start) = millis();
+                ESP_LOGI("service_wifi", "WiFi service mode ON for ${service_wifi_minutes} min");
+            - wifi.enable:
+
+interval:
+  - interval: 1s
+    then:
+      - if:
+          condition:
+            lambda: 'return id(service_wifi_on) && (millis() - id(service_wifi_start) >= ${service_wifi_minutes} * 60000UL);'
+          then:
+            - script.execute: service_wifi_toggle

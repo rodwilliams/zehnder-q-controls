@@ -1,6 +1,7 @@
 # "Scan for docs" page for the AtomS3 / AtomS3R screens: a QR code of ${docs_url} (set in
 # documentation_local.yml). Shown (a) as the start-up splash and (b) whenever the front screen button is
-# pressed - for 60 s, or until pressed again. The screen lambdas in uc1_/uc2_status_screen_local.yml draw it.
+# pressed (short press) - for 60 s, or until pressed again. A LONG press toggles WiFi service mode
+# (service_wifi_local.yml, which must be included too). The screen lambdas in uc1_/uc2_status_screen_local.yml draw it.
 # The button is GPIO41 on both the AtomS3 and the AtomS3R (active low) - M5Unified, board_M5AtomS3/S3R.
 qr_code:
   - id: info_qr
@@ -22,9 +23,20 @@ interval:
   - interval: 50ms
     then:
       - lambda: |-
-          static bool was_pressed = false;
+          // Short press (release before ${service_wifi_hold_ms} ms): QR page. Long press: WiFi service mode
+          // (service_wifi_local.yml), acting the moment the hold time is reached.
+          static bool was_pressed = false, fired = false;
+          static uint32_t t_down = 0;
           const bool pressed = gpio_get_level(GPIO_NUM_41) == 0; // active low
           if (pressed && !was_pressed) {
+            t_down = millis();
+            fired = false;
+          }
+          if (pressed && !fired && millis() - t_down >= ${service_wifi_hold_ms}UL) {
+            fired = true;
+            id(service_wifi_toggle).execute();
+          }
+          if (!pressed && was_pressed && !fired) {
             if (id(info_page_on) && millis() - id(info_page_start) < 60000) {
               id(info_page_on) = false;
             } else {

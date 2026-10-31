@@ -47,12 +47,18 @@ display:
       it.filled_rectangle(0, 0, w, 17, BLUE);
       it.print(w / 2, 8, id(font_m), WHITE, TextAlign::CENTER, "Q DAMPERS");
 
-      it.filled_circle(6, 26, 4, wifi_ok ? GREEN : RED);
-      if (wifi_ok) {
+      const bool svc = id(service_wifi_on);
+      const int svc_min = svc ? (int) ((${service_wifi_minutes} * 60000UL - (millis() - id(service_wifi_start))) / 60000UL) + 1 : 0;
+      it.filled_circle(6, 26, 4, !svc ? GREY : (wifi_ok ? GREEN : AMBER));
+      if (!svc) {
+        it.print(14, 20, id(font_s), GREY, "WiFi off");
+        it.print(14, 33, id(font_s), GREY, "hold btn=service");
+      } else if (wifi_ok) {
         it.printf(14, 20, id(font_s), WHITE, "%s", wifi::global_wifi_component->get_ip_addresses()[0].str().c_str());
-        it.printf(14, 33, id(font_s), GREY, "%d dBm", (int) wifi::global_wifi_component->wifi_rssi());
+        it.printf(14, 33, id(font_s), GREY, "%d dBm %d min", (int) wifi::global_wifi_component->wifi_rssi(), svc_min);
       } else {
-        it.print(14, 20, id(font_s), RED, "WiFi down");
+        it.print(14, 20, id(font_s), AMBER, "WiFi joining...");
+        it.printf(14, 33, id(font_s), GREY, "%d min left", svc_min);
       }
 
       it.filled_circle(6, 52, 4, can_ok ? GREEN : RED);

@@ -44,7 +44,7 @@ flicker between 2 and 3, and the Q's own boost logic provides the run-on. **Clos
 
 ## Status screen (AtomS3R)
 
-QR code to this documentation for 6 s (and for 60 s whenever the screen is pressed), then: WiFi dot + IP + signal (dBm), CAN dot, fan level
+QR code to this documentation for 6 s (and for 60 s whenever the screen is pressed; a long press switches WiFi service mode on or off), then: WiFi dot (grey = off, shows the IP and minutes left when on), CAN dot, fan level
 and name, Q mode, supply flow, and a large box **green "CLOSED 0V" / amber "OPEN 10V"** showing what the
 DAC is commanded to. A lit screen with a wrong or missing picture usually means the wrong panel file
 ([hardware doc](hardware-and-pitfalls.md)).
