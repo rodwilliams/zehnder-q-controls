@@ -100,26 +100,31 @@ The IP address is on the board's screen; the node name is `zehnder-q-humidity-<m
   in the venv; reads the API key from `secrets.yaml`). Output goes to `recordings/` (not committed).
 - Device web page has a **Documentation** entry pointing at this repository.
 
-## WiFi: off by default ("service mode")
+## WiFi policy ("join at boot, otherwise off")
 
 Both projects are meant to run **without being on the site network** (nothing is reachable at the site
-while the unit does its job). The WiFi radio is **off at boot**; the damper/humidity logic does not need it.
+while the unit does its job). The damper/humidity logic never needs WiFi, so WiFi is only on while it has a
+network to talk to:
 
-- **Switch WiFi on:** hold the screen button for about 2.5 seconds. WiFi stays on for **15 minutes**, then
-  switches itself off. Hold again to switch it off sooner. The screen shows "WiFi off" / "WiFi joining..." /
-  the IP address with the minutes left.
-- It joins the network in `secrets.yaml` (`wifi_ssid`) - **bring that network with you** (a phone hotspot, a
-  travel router, or a laptop access point set up with that name and password).
-- If it cannot join it, after about a minute it offers its own **fallback hotspot** (exact name not
-  recorded: look for a network named after the device; password = `wifi_hotspot_password`). Join it,
-  and a setup page should open (otherwise browse to `192.168.4.1`); choose the new network and its password.
-  It is only available during the 15-minute window.
-- A WiFi update still running when the window ends fails safely: the old firmware stays in place. Start again.
+- **At boot** the board tries to join the network in `secrets.yaml` (`wifi_ssid`) for **45 seconds**.
+  - **Joined:** WiFi stays on while that network is there (bench work, commissioning, the recorder). If the link
+    is then lost for **2 minutes**, WiFi switches off.
+  - **Not joined:** WiFi switches **off** (before the fallback hotspot would start). The screen shows "WiFi off".
+  So **bring the network with you** (a phone hotspot, travel router, or a laptop access point with that name and
+  password) and power the board up *after* it is available - or use the button below.
+- **Button (service window):** hold the screen button for about 2.5 seconds to switch WiFi on for **15 minutes**
+  (hold again to switch it off sooner). It joins the network, or - if it cannot after about a minute - offers its own
+  **fallback hotspot** (exact name not recorded: look for a network named after the device; password =
+  `wifi_hotspot_password`). Join that, and a setup page should open (otherwise browse to `192.168.4.1`); choose
+  the new network and its password. The 15 minutes end automatically; a WiFi update still running then fails
+  safely (the old firmware stays in place) - start again.
+- The screen shows "WiFi off" / "WiFi joining..." / the IP address and signal (and the minutes left in a button
+  window).
 - Neither WiFi nor the API reboots the board for lack of a network. ESPHome's default is to reboot after
   15 minutes without one; on the damper controller each reboot drops the output to 0 V, so this is disabled
-  (`reboot_timeout: 0s` in `service_wifi_local.yml`).
+  (`reboot_timeout: 0s`). All of this is in `service_wifi_local.yml` (times are substitutions at the top).
 
-Working rule: **in the enclosure, update over WiFi (service mode); out of it, over USB.** Never connect USB
+Working rule: **in the enclosure, update over WiFi (power up with the commissioning network present, or use the button); out of it, over USB.** Never connect USB
 while the Mini CAN Unit is on the Q's 12 V.
 
 The development project (`ZehnderQAdaptor.yaml`) does not use service mode: its WiFi is always on.

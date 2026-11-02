@@ -1,36 +1,56 @@
-# WiFi "service mode" for deployments that are NOT on the site network (security: nothing is reachable
-# at the site while the unit is just doing its job).
+# WiFi policy for deployments that are NOT on the site network (security: nothing is reachable at the
+# site while the unit is just doing its job). The control logic (damper output / humidity boost) never
+# needs WiFi.
 #
-#   - The WiFi radio is OFF at boot. The control logic (damper output / humidity boost) does not need it.
-#   - HOLD the screen button for ${service_wifi_hold_ms} ms to switch WiFi on for ${service_wifi_minutes} minutes
-#     (hold again to switch it off sooner). It joins the network named in secrets.yaml (bring that network
-#     with you), or - if it cannot - offers its own fallback hotspot, as documented in docs/build-flash-recover.md.
-#     After the time is up WiFi switches itself off again.
-#   - Neither the WiFi nor the API reboots the board when there is no network. (ESPHome's defaults reboot after
-#     15 minutes without a connection; for the damper controller every reboot drops the output to 0 V.)
+#   BOOT:   WiFi tries to join the network in secrets.yaml for ${boot_wifi_join_s} s.
+#             - joined      -> stays on while that network is there (bench / commissioning). If the link is
+#                              then lost for ${boot_wifi_lost_s} s, WiFi switches off.
+#             - not joined  -> WiFi switches OFF (before the fallback hotspot would start, which takes ~60 s).
+#   BUTTON: HOLD the screen button ${service_wifi_hold_ms} ms to switch WiFi on for ${service_wifi_minutes} minutes
+#           (hold again to switch it off sooner). This is the "service window": it joins the network, or - if it
+#           cannot - offers the fallback hotspot (docs/build-flash-recover.md) so a new network can be entered.
+#           A WiFi update still running when the window ends fails safely: the old firmware stays in place.
+#   Neither WiFi nor the API reboots the board when there is no network. (ESPHome's defaults reboot after
+#   15 minutes without a connection; for the damper controller every reboot drops the output to 0 V.)
 #
 # The long-press detection lives in info_page_local.yml (the same button), so include BOTH files together.
-# A WiFi update that is still running when the time is up fails safely: the old firmware stays in place.
 substitutions:
   service_wifi_minutes: "15"
   service_wifi_hold_ms: "2500"
+  boot_wifi_join_s: "45"
+  boot_wifi_lost_s: "120"
 
 wifi:
-  enable_on_boot: false
   reboot_timeout: 0s
 
 api:
   reboot_timeout: 0s
 
 globals:
-  - id: service_wifi_on
+  - id: service_wifi_on # is the radio on?
     type: bool
-    initial_value: "false"
-  - id: service_wifi_start
+    initial_value: "true"
+  - id: service_wifi_mode # 0 off, 1 trying to join after boot, 2 joined at boot (stays on), 3 button service window
+    type: int
+    initial_value: "1"
+  - id: service_wifi_start # when mode 1 / mode 3 began (millis)
+    type: uint32_t
+    initial_value: "0"
+  - id: service_wifi_last_conn # last time WiFi was seen connected (millis)
     type: uint32_t
     initial_value: "0"
 
 script:
+  - id: service_wifi_stop
+    mode: single
+    then:
+      - lambda: |-
+          id(service_wifi_on) = false;
+          id(service_wifi_mode) = 0;
+          ESP_LOGI("service_wifi", "WiFi switched OFF");
+      - wifi.disable:
+
+  # Long press: off if on, otherwise the ${service_wifi_minutes}-minute service window.
   - id: service_wifi_toggle
     mode: single
     then:
@@ -38,22 +58,42 @@ script:
           condition:
             lambda: 'return id(service_wifi_on);'
           then:
-            - lambda: |-
-                id(service_wifi_on) = false;
-                ESP_LOGI("service_wifi", "WiFi service mode OFF");
-            - wifi.disable:
+            - script.execute: service_wifi_stop
           else:
             - lambda: |-
                 id(service_wifi_on) = true;
+                id(service_wifi_mode) = 3;
                 id(service_wifi_start) = millis();
-                ESP_LOGI("service_wifi", "WiFi service mode ON for ${service_wifi_minutes} min");
+                ESP_LOGI("service_wifi", "WiFi service window ON for ${service_wifi_minutes} min");
             - wifi.enable:
 
 interval:
   - interval: 1s
     then:
-      - if:
-          condition:
-            lambda: 'return id(service_wifi_on) && (millis() - id(service_wifi_start) >= ${service_wifi_minutes} * 60000UL);'
-          then:
-            - script.execute: service_wifi_toggle
+      - lambda: |-
+          if (!id(service_wifi_on)) return;
+          const uint32_t now = millis();
+          const bool conn = wifi::global_wifi_component->is_connected();
+          if (conn) id(service_wifi_last_conn) = now;
+          const int mode = id(service_wifi_mode);
+          bool stop = false;
+          if (mode == 1) {
+            if (conn) {
+              id(service_wifi_mode) = 2;
+              ESP_LOGI("service_wifi", "joined at boot: WiFi stays on while the network is there");
+            } else if (now - id(service_wifi_start) >= ${boot_wifi_join_s} * 1000UL) {
+              ESP_LOGW("service_wifi", "no network within ${boot_wifi_join_s} s of boot: switching WiFi off");
+              stop = true;
+            }
+          } else if (mode == 2) {
+            if (!conn && now - id(service_wifi_last_conn) >= ${boot_wifi_lost_s} * 1000UL) {
+              ESP_LOGW("service_wifi", "network lost for ${boot_wifi_lost_s} s: switching WiFi off");
+              stop = true;
+            }
+          } else if (mode == 3) {
+            if (now - id(service_wifi_start) >= ${service_wifi_minutes} * 60000UL) {
+              ESP_LOGI("service_wifi", "service window over: switching WiFi off");
+              stop = true;
+            }
+          }
+          if (stop) id(service_wifi_stop).execute();

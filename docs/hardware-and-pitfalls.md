@@ -101,6 +101,23 @@ A USB power bank was observed to give a reboot loop and poor WiFi; use a proper 
   or stay open. Test it: with the system running and the dampers open, unplug the ESP32 and watch them. If
   they do not close, a pull-down resistor from AIN to GND at the FTCU is the fix (about 10 kohm is a
   starting point - confirm against the FTCU's input impedance in the Lindab documentation).
+  **Record these three cases** (use a *verified* meter - see pitfall 8), one row each, with the Q running at
+  fan 2 so the commanded output is 0 V, and note the date, the FTCU model/size and its settings
+  (4x071, 4x070, 4x500, and 4x510/4x511 if 2-10 V):
+
+  | Case | How | Damper: closes / holds / drifts / opens | Voltage at the FTCU AIN terminal |
+  |---|---|---|---|
+  | Baseline | DAC powered, commanding 0 V | | |
+  | Open circuit | Disconnect the AIN wire at the FTCU, DAC still powered | | |
+  | DAC unpowered | Power off the ESP32 and DAC (the real fault case: lost CAN, dead ESP32) | | |
+
+  Also look at the FTCU's "Unit Status" (Modbus 3x013, in the UltraLink app) to see whether it enters an
+  override state. If the damper does not close in the open-circuit or unpowered case, fit the pull-down
+  resistor described above and repeat the test.
+  Background (Lindab FTCU manual, 2021-02-19): in the **2-10 V** range with flow regulation (4x500 = 2 and
+  4x070 = 2, the factory defaults) the FTCU forces the damper **fully closed** when the input is below
+  register 4x511 (default read as 0.8 V); in the 0-10 V range this override does not exist. What happens to a
+  truly floating input is **not documented**, which is why it is tested.
 - **Common reference.** The DAC's GND must be connected to the FTCU's signal ground (system neutral) so
   the 0-10 V is measured against the right reference; with 24 V AC supplies that share a neutral, confirm
   with a meter that the DAC GND and FTCU neutral are at the same potential before connecting the signal.

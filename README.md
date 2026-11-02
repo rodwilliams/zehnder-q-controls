@@ -60,8 +60,9 @@ Full procedure, including the first USB flash, in [docs/build-flash-recover.md](
 - **The OTA password in the current deployment is empty** (as in the upstream example), so anyone on
   the same WiFi network can reflash a board. Set `ota_password` before a deployment on a shared network.
   How secrets, the OTA password and USB recovery work: [docs/build-flash-recover.md](docs/build-flash-recover.md#secrets-and-wireless-ota-updates).
-- The device web page has no login. To limit exposure the control projects keep **WiFi off by default**:
-  hold the screen button ~2.5 s to switch it on for 15 minutes ([service mode](docs/build-flash-recover.md#wifi-off-by-default-service-mode)).
+- The device web page has no login. To limit exposure the control projects try WiFi for 45 s at boot and
+  **switch it off if there is no network**; hold the screen button ~2.5 s for a 15-minute service window
+  ([WiFi policy](docs/build-flash-recover.md#wifi-policy-join-at-boot-otherwise-off)).
 
 ## Credits and licence
 

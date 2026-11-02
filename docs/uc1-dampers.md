@@ -44,7 +44,7 @@ flicker between 2 and 3, and the Q's own boost logic provides the run-on. **Clos
 
 ## Status screen (AtomS3R)
 
-QR code to this documentation for 6 s (and for 60 s whenever the screen is pressed; a long press switches WiFi service mode on or off), then: WiFi dot (grey = off, shows the IP and minutes left when on), CAN dot, fan level
+QR code to this documentation for 6 s (and for 60 s whenever the screen is pressed; a long press switches WiFi on or off for 15 minutes), then: WiFi dot (grey = off; the IP when on), CAN dot, fan level
 and name, Q mode, supply flow, and a large box **green "CLOSED 0V" / amber "OPEN 10V"** showing what the
 DAC is commanded to. A lit screen with a wrong or missing picture usually means the wrong panel file
 ([hardware doc](hardware-and-pitfalls.md)).
@@ -60,7 +60,7 @@ DAC is commanded to. A lit screen with a wrong or missing picture usually means 
 
 1. Dampers physically move (the bench had no dampers).
 2. What the FTCU does when the DAC loses power while the FTCU (24 V AC, separate supply) stays live - do the
-   unplug test in the pitfalls doc; a pull-down resistor from AIN to GND is the fix if the dampers do not close.
+   three-case test table in the pitfalls doc (record the results there); a pull-down resistor from AIN to GND is the fix if the dampers do not close.
 3. The Q is left in **Auto** after any manual test - in a manual mode its automatic free-cooling boost
    may not engage.
 4. FTCU configured as described in the hardware doc (analogue input enabled, voltage range, angle control).
