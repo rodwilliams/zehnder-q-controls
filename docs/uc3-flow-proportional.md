@@ -22,9 +22,12 @@ Measured on the bench unit (recordings of 2026-11-02, not committed):
 - Over the whole 100-300 range the supply flow is a straight line of the demand:
   `flow = 41 + 0.55 x PDO 226` m3/h (residual under 1 m3/h). So the demand *is* "flow between level 2 and
   level 3" - no per-level flow rates are needed.
-- Humidity modulation: at the onset (the same second Ventilation Mode becomes Overruling) the demand jumps from
-  200 to ~225, climbs to ~243 in about 8 s, steps to **300**, holds a minute, then decays **linearly at about
-  10 counts a minute** (it was still 233 seven minutes later, long after the humidity was back to normal).
+- Humidity modulation (two events recorded on 2026-11-02): at the onset (the same second Ventilation Mode becomes
+  Overruling) the demand leaves 200 and goes to **300** within seconds - in the first event via 225 and 243
+  (about 8 s), in the second straight to 281 then 300, so the jump size depends on how fast the humidity rises.
+  It then decays **linearly**: about 10 counts a minute in the first event (still 233 seven minutes later) and
+  about 14-18 a minute in the second. The Q runs on long after the humidity is back to normal. Do not rely on a
+  fixed decay rate.
 - The demand changes in the same second as the level; the **airflow lags by 5-30 s** (about 20 % after 10 s, 73 %
   after 20 s, 96 % after 30 s), so the signal leads the air.
 - In manual modes the Q switches its humidity modulation off (Ventilation Mode = Disabled) and the value is
@@ -63,9 +66,16 @@ the number on the device as well.
 QR code for 6 s (and for 60 s on a short press; a long press is the WiFi service window), then WiFi state, CAN,
 fan level, the demand with its end points, supply flow, and the commanded voltage with a bar.
 
+## Verified on the bench
+
+- 2026-11-02, second humidity event with UC3 running on a board on the Q: the commanded voltage matched
+  (demand - 200) / 10 to within one count at every sample, reaching 10.0 V three seconds after the onset (airflow
+  needs about 30 s). A trusted meter on the open DAC output agreed with the displayed voltage to 0.06 V (the same
+  +0.06 V seen at 10 V in the sweep test, i.e. DAC/meter tolerance).
+
 ## Not yet verified
 
-- The first run on a live damper: how an FTCU in flow mode behaves along 0-10 V (see the FTCU notes in
+- A live damper (the DAC output has so far been open): how an FTCU in flow mode behaves along 0-10 V (see the FTCU notes in
   `hardware-and-pitfalls.md`). In 0-10 V mode, 0 V is simply "minimum".
 - Whether the demand behaves the same for other overrides (RF/analogue input presets, other timers).
 - The output at Away (expected: demand 0).
