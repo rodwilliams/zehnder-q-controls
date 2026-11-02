@@ -8,6 +8,7 @@ maintained here, each on its own hardware and each built from its own top-level 
 |---|---|---|---|
 | **UC1 - free-cooling dampers** | `FreeCoolingDampers.yaml` | Output **10 V while the Q runs at fan level 3, 0 V otherwise**, to open/close Lindab UltraLink FTCU dampers. Default (boot, no data, no CAN) is closed. | AtomS3**R** + Mini CAN Unit + GP8413 DAC, status screen |
 | **UC2 - humidity boost** | `HumidityBoost.yaml` | When the Q starts overruling for humidity, **force a timed boost to fan level 3** (default 300 s) and repeat while the Q is still overruling. The Q returns itself to Auto when the timer ends. | plain AtomS3 + Mini CAN Unit, status screen |
+| **UC3 - flow-proportional dampers** | `FlowProportionalDampers.yaml` | Output follows the Q's airflow demand (PDO 226): **0 V at level 2, 10 V at level 3, linear in between** (humidity modulation, boost and manual High included). | AtomS3**R** + Mini CAN Unit + GP8413 DAC, status screen |
 | Bench test | `dac_sweep_test.yaml` | Steps the DAC through 0 / 2.5 / 5 / 7.5 / 10 V (4 s each) to check the DAC and your meter. Replaces UC1 on the board. | AtomS3R + GP8413 |
 | Development | `ZehnderQAdaptor.yaml` | Impersonates the Zehnder *Option Box* to inject 0-10 V analogue inputs. **Paused**, not for production. | AtomS3R + Mini CAN + DAC |
 
@@ -19,6 +20,7 @@ maintained here, each on its own hardware and each built from its own top-level 
 
 - [docs/build-flash-recover.md](docs/build-flash-recover.md) - **start here to rebuild**: tools, first flash, updates, WiFi recovery, restoring stock firmware
 - [docs/uc1-dampers.md](docs/uc1-dampers.md) - UC1 behaviour, entities, what to check on site
+- [docs/uc3-flow-proportional.md](docs/uc3-flow-proportional.md) - UC3 behaviour, the PDO 226 evidence, settings
 - [docs/uc2-humidity-boost.md](docs/uc2-humidity-boost.md) - UC2 behaviour, the evidence behind it, safeguards, known limits
 - [docs/hardware-and-pitfalls.md](docs/hardware-and-pitfalls.md) - wiring, pins, boards, and the mistakes already made (read before debugging hardware)
 - [docs/q-protocol-notes.md](docs/q-protocol-notes.md) - CAN/PDO findings reverse-engineered from live captures

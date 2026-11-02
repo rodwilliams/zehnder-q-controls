@@ -1,0 +1,142 @@
+# UC3 (flow-proportional damper output): DAC channel 0 follows the Q's own continuous airflow demand.
+#
+#   Q demand = PDO 226 "Fan Speed Modulated" (bench-verified 2026-11-02): 100 = Low, 200 = Medium (level 2),
+#   300 = High (level 3) and every value in between while the Q modulates for humidity. Supply flow is a
+#   straight line of it (flow ~ 41 + 0.55 x demand m3/h on the bench unit, +-1 m3/h), and the demand LEADS the
+#   airflow by 5-30 s.
+#
+#     demand >= base (200)  ->  0 V at the base, rising linearly to 10 V at the top (300)
+#     demand <  base        ->  "Below-Base Voltage" (default 0 V): Low, Away, level 0
+#     anything unknown      ->  0 V: just booted, no demand received yet, no CAN traffic for
+#                               uc3_bus_timeout_ms (Q off, cable out, bus fault), nonsensical settings
+#
+# Base, top and the below-base voltage are on-device settings (kept across reboots). Reuses the UC1 structure:
+# 1 s evaluation, DAC re-asserted every 5 s, both channels forced to 0 V at boot, the demand re-requested every
+# minute and whenever the bus comes back. Does NOT use Option Box impersonation.
+#
+# Needs: components zehnder_comfoair_q + gp8413, dac_local.yml (dac_channel_0/1), and base_local.yml's
+# fan_speed_modulated sensor (PDO 226).
+substitutions:
+  uc3_bus_timeout_ms: "30000" # the Q heartbeats every ~2 s
+
+esphome:
+  on_boot:
+    - priority: -100 # after everything else is up
+      then:
+        # Known state straight away; the DAC keeps its last value across an ESP32 reset.
+        - output.set_level: { id: dac_channel_0, level: 0.0 }
+        - output.set_level: { id: dac_channel_1, level: 0.0 }
+
+number:
+  - platform: template
+    id: uc3_base
+    name: "Flow Base Value"
+    icon: mdi:ray-start
+    entity_category: config
+    optimistic: true
+    min_value: 0
+    max_value: 400
+    step: 1
+    initial_value: 200 # Q demand that gives 0 V (level 2)
+    restore_value: true
+  - platform: template
+    id: uc3_top
+    name: "Flow Top Value"
+    icon: mdi:ray-end
+    entity_category: config
+    optimistic: true
+    min_value: 0
+    max_value: 400
+    step: 1
+    initial_value: 300 # Q demand that gives 10 V (level 3)
+    restore_value: true
+  - platform: template
+    id: uc3_below_v
+    name: "Below-Base Voltage"
+    icon: mdi:arrow-collapse-down
+    entity_category: config
+    unit_of_measurement: "V"
+    optimistic: true
+    min_value: 0
+    max_value: 10
+    step: 0.1
+    initial_value: 0 # output while the Q demand is below the base (Low / Away / 0)
+    restore_value: true
+
+sensor:
+  - platform: template
+    id: damper_output_volts
+    name: "Damper Output Voltage"
+    unit_of_measurement: "V"
+    device_class: voltage
+    accuracy_decimals: 2
+    state_class: measurement
+    filters:
+      - delta: 0.04
+
+text_sensor:
+  - platform: template
+    id: damper_control_state
+    name: "Damper Control State"
+    icon: mdi:valve
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          const float x = id(fan_speed_modulated).state; // NaN until the Q has reported PDO 226
+          const bool alive = id(comfoair)->bus_alive(${uc3_bus_timeout_ms});
+          static bool was_alive = false;
+          static float last_v = -1.0f;
+          static uint32_t last_write_ms = 0;
+          static std::string last_state;
+
+          // Bus just came back: the Q may have restarted, so ask for the demand again.
+          if (alive && !was_alive)
+            id(comfoair)->request_pdo(226);
+          was_alive = alive;
+
+          float base = id(uc3_base).state, top = id(uc3_top).state, below = id(uc3_below_v).state;
+          if (isnan(base)) base = 200.0f;   // settings not restored yet
+          if (isnan(top)) top = 300.0f;
+          if (isnan(below)) below = 0.0f;
+          below = fmin(10.0f, fmax(0.0f, below));
+
+          float volts = 0.0f;
+          char state[64];
+          if (!alive) {
+            snprintf(state, sizeof(state), "0 V - no CAN bus activity");
+          } else if (std::isnan(x)) {
+            snprintf(state, sizeof(state), "0 V - waiting for Q demand");
+          } else if (!(top > base)) {
+            snprintf(state, sizeof(state), "0 V - top must be above base");
+          } else if (x < base) {
+            volts = below;
+            snprintf(state, sizeof(state), "%.1f V - demand %d below base %d", volts, (int) x, (int) base);
+          } else {
+            volts = 10.0f * fmin(1.0f, (x - base) / (top - base));
+            snprintf(state, sizeof(state), "%.1f V - demand %d (%d-%d)", volts, (int) x, (int) base, (int) top);
+          }
+
+          const bool changed = fabs(volts - last_v) >= 0.02f;
+          if (changed || millis() - last_write_ms >= 5000) {
+            id(dac_channel_0).set_level(volts / 10.0f);
+            last_write_ms = millis();
+          }
+          if (changed) {
+            ESP_LOGI("uc3", "Damper output %.2f V (%s)", volts, state);
+            last_v = volts;
+            id(damper_output_volts).publish_state(volts);
+          }
+          if (last_state != state) {
+            last_state = state;
+            id(damper_control_state).publish_state(state);
+          }
+
+  # The Q publishes the demand when it changes; ask for it every minute anyway (a single RTR frame), so a
+  # missed frame cannot leave the output stale for long.
+  - interval: 60s
+    then:
+      - lambda: |-
+          if (id(comfoair)->bus_alive(${uc3_bus_timeout_ms}))
+            id(comfoair)->request_pdo(226);

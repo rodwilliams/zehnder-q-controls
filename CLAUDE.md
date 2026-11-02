@@ -26,6 +26,8 @@ Read `README.md` first, then `docs/`. This file holds the working rules that are
 - UC1: 10 V only at fan level 3; closed (0 V) on anything unknown; no hysteresis.
 - UC2: act only when the Q is in **Auto**, never at fan 3, boost length 300 s, re-boost while the Q still reports
   Overruling. A flow/humidity trigger was tried and **removed on purpose**.
+- UC3: output 0 V at demand 200 (level 2) to 10 V at 300 (level 3), linear; 0 V below the base for now (the owner may
+  change it after seeing the system); drive it from PDO 226 ("Fan Speed Modulated"), not from flow rates.
 - The Option Box emulation is **paused** - do not resume it unprompted.
 - If you add a safeguard that changes behaviour, say so plainly.
 

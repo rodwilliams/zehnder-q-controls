@@ -58,6 +58,17 @@ web_server:
   ota: false
   local: true
 
+# PDO 226 "Fan speed (modulated)": per aiocomfoconnect's PDO notes 0/100/200/300 = away/low/medium/high, and
+# 0-300 when the Q modulates for humidity (Ventilation Mode = Overruling) - i.e. the Q's own continuous
+# target between level 2 and level 3. Unfiltered on purpose (it is recorded, and used for UC3 experiments).
+sensor:
+  - platform: template
+    id: fan_speed_modulated
+    name: "Fan Speed Modulated"
+    icon: mdi:fan-chevron-up
+    accuracy_decimals: 0
+    state_class: measurement
+
 # See docs: https://github.com/michaelarnauts/aiocomfoconnect/blob/master/docs/PROTOCOL-PDO.md
 zehnder_comfoair_q:
   id: comfoair
@@ -96,6 +107,7 @@ zehnder_comfoair_q:
       220,
       221,
       225,
+      226,
       227,
       274,
       275,

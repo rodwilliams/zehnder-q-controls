@@ -61,6 +61,7 @@ canbus:
                   comfoair_on_frame_case(220, id(comfoair), pre_heater_temp_before,           false);
                   comfoair_on_frame_case(221, id(comfoair), post_heater_temp_after,           false);
                   comfoair_on_frame_case(225, id(comfoair), ventilation_mode,                  true);
+                  comfoair_on_frame_case(226, id(comfoair), fan_speed_modulated,               true);
                   comfoair_on_frame_case(227, id(comfoair), bypass_state,                      true);
                   comfoair_on_frame_case(274, id(comfoair), extract_air_temp,                 false);
                   comfoair_on_frame_case(275, id(comfoair), exhaust_air_temp,                 false);

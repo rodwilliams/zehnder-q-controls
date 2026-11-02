@@ -1,0 +1,89 @@
+# On-site status screen for system 3 (flow-proportional dampers, UC3). 128x128, redrawn once a second.
+# QR code to the documentation for 6 s after boot (and for 60 s on a short button press); a long press is the
+# WiFi service window (see service_wifi_local.yml). Then the live page:
+#
+#     [ Q FLOW DAMPERS ]         title bar
+#     * IP / WiFi state          WiFi dot + IP + signal
+#     * CAN ok                   CAN dot
+#     Fan  Medium (2)            fan level
+#     Dem  233 (200-300)         the Q's airflow demand (PDO 226) and the 0 V / 10 V end points
+#     Flow 171 m3/h              supply flow
+#     [ 3.3 V ===----- ]         the voltage the DAC is commanded to, with a bar
+#
+# Needs display_atoms3r_common_local.yml + a panel file (id: lcd) and uc3_flow_proportional_output.yml.
+display:
+  - id: !extend lcd
+    lambda: |-
+      const Color BLACK(0, 0, 0), WHITE(255, 255, 255), GREY(140, 140, 140);
+      const Color RED(230, 40, 40), GREEN(0, 190, 60), BLUE(30, 70, 170), AMBER(255, 170, 0);
+      const int w = it.get_width();
+      const int h = it.get_height();
+      it.fill(BLACK);
+
+      const bool info_page = id(info_page_on) && (millis() - id(info_page_start) < 60000);
+      if (millis() < 6000 || info_page) {
+        // ---- QR code to the documentation (start-up splash, or button pressed) ----
+        it.fill(WHITE);
+        const int qs = id(info_qr)->get_size();
+        const int scale = (w - 24) / qs;
+        const int qw = qs * scale;
+        it.qr_code((w - qw) / 2, 10, id(info_qr), BLACK, scale);
+        it.print(w / 2, 10 + qw + 5, id(font_s), BLACK, TextAlign::TOP_CENTER, "Scan for docs");
+        it.printf(w / 2, 10 + qw + 17, id(font_s), GREY, TextAlign::TOP_CENTER, "v%s", ESPHOME_PROJECT_VERSION);
+        return;
+      }
+
+      // ---- live status ----
+      const bool wifi_ok = wifi::global_wifi_component->is_connected();
+      const bool can_ok = id(comfoair)->bus_alive(${uc3_bus_timeout_ms});
+      const float level = id(fan_level_raw).state;
+      const float dem = id(fan_speed_modulated).state;
+      const float flow = id(supply_fan_flow).state;
+      float volts = id(damper_output_volts).has_state() ? id(damper_output_volts).state : 0.0f;
+      if (isnan(volts)) volts = 0.0f;
+      if (!can_ok) volts = 0.0f;
+
+      it.filled_rectangle(0, 0, w, 17, BLUE);
+      it.print(w / 2, 8, id(font_m), WHITE, TextAlign::CENTER, "Q FLOW DAMPERS");
+
+      const bool svc = id(service_wifi_on);
+      const bool win = svc && id(service_wifi_mode) == 3; // button service window (shows minutes left)
+      const int svc_min = win ? (int) ((${service_wifi_minutes} * 60000UL - (millis() - id(service_wifi_start))) / 60000UL) + 1 : 0;
+      it.filled_circle(6, 26, 4, !svc ? GREY : (wifi_ok ? GREEN : AMBER));
+      if (!svc) {
+        it.print(14, 20, id(font_s), GREY, "WiFi off");
+        it.print(14, 33, id(font_s), GREY, "hold btn=service");
+      } else if (wifi_ok) {
+        it.printf(14, 20, id(font_s), WHITE, "%s", wifi::global_wifi_component->get_ip_addresses()[0].str().c_str());
+        if (win)
+          it.printf(14, 33, id(font_s), GREY, "%d dBm %d min", (int) wifi::global_wifi_component->wifi_rssi(), svc_min);
+        else
+          it.printf(14, 33, id(font_s), GREY, "%d dBm", (int) wifi::global_wifi_component->wifi_rssi());
+      } else {
+        it.print(14, 20, id(font_s), AMBER, "WiFi joining...");
+        if (win)
+          it.printf(14, 33, id(font_s), GREY, "%d min left", svc_min);
+      }
+
+      it.filled_circle(6, 52, 4, can_ok ? GREEN : RED);
+      it.print(14, 46, id(font_s), can_ok ? WHITE : RED, can_ok ? "CAN ok" : "CAN: no bus");
+
+      if (isnan(level))
+        it.print(2, 59, id(font_s), AMBER, "Fan  ?");
+      else
+        it.printf(2, 59, id(font_s), WHITE, "Fan  %s (%d)", id(fan_level).state.c_str(), (int) level);
+      if (isnan(dem))
+        it.print(2, 72, id(font_s), AMBER, "Dem  ?");
+      else
+        it.printf(2, 72, id(font_s), dem > 200.5f ? AMBER : WHITE, "Dem  %d (%d-%d)", (int) dem, (int) id(uc3_base).state, (int) id(uc3_top).state);
+      if (isnan(flow))
+        it.print(2, 85, id(font_s), GREY, "Flow --");
+      else
+        it.printf(2, 85, id(font_s), WHITE, "Flow %.0f m3/h", flow);
+
+      // the output the dampers are driven with (DAC channel 0): voltage and a bar
+      const int by = 100;
+      it.filled_rectangle(0, by, w, h - by, Color(30, 30, 30));
+      it.printf(w / 2, by + 10, id(font_l), volts > 0.05f ? AMBER : WHITE, TextAlign::CENTER, "%.1f V", volts);
+      it.rectangle(4, h - 11, w - 8, 8, GREY);
+      it.filled_rectangle(4, h - 11, (int) ((w - 8) * fmin(1.0f, volts / 10.0f)), 8, AMBER);
