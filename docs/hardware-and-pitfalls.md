@@ -33,7 +33,7 @@ Both are ESP32-S3 with 8 MB flash, so the USB name does not tell you. Run:
 | Screen SPI | MOSI 21, SCLK 17, DC 33, CS 15, RST 34 | MOSI 21, SCLK 15, DC 42, CS 14, RST 48 |
 | Screen backlight | plain PWM, **GPIO16** | LP5562 LED driver at I2C 0x30, **SDA 45 / SCL 0** (use 50 kHz) |
 | Screen panel | GC9107, 128x128 window at row offset 32 | GC9107 (older units) or ST7735S (built after ~May 2026) |
-| DAC I2C (bottom pin header "G39 / G38 / 5V / G") | SDA 38, SCL 39 | SDA **38**, SCL **39** |
+| DAC I2C (bottom pin header "G39 / G38 / 5V / G") | SDA 38, SCL 39 | SDA **38**, SCL **39** (UC3: GPIO5 / GPIO6, for the ToUnit Base) |
 
 Screen pins and panel details come from M5Stack's own library (`M5GFX`, `board_M5AtomS3` and
 `board_M5AtomS3R`), not from web summaries. M5GFX detects the panel controller at boot by reading its
@@ -58,6 +58,31 @@ in the UltraLink app: analogue input enabled (Modbus register 4x071 = 1), voltag
 simple open/closed (the factory input is a *flow* setpoint). Useful FTCU diagnostics: register 3x013
 "Unit Status" (0 normal, 1 locating flow, 2 override, 3 error, 4 regulating, 5 calibrating) and
 4x151 "Override" (forces max/min/open/closed, overriding the analogue input).
+
+## Atomic ToUnit Base (M5Stack A161) - replacing the soldered DAC pins
+
+The base turns the S3R's bottom pins into a Grove (HY2.0-4P) socket, so the DAC can plug straight in. Read from
+M5Stack's schematic (2025-08-28, image on the product page) on 2026-11-02:
+
+- **Only GPIO5, 6, 7, 8 are routed**, through an 8-way DIP switch (switches 1-4 connect G5, G6, G7, G8 to one
+  signal wire, 5-8 connect the same four to the other). **GPIO38 and GPIO39 - where the soldered DAC cable goes
+  today - are not connected** on the base (they carry no-connect marks). 5 V and GND reach the plug. Enable
+  **each GPIO in only one group.** Our DAC cable has **yellow = SDA, white = SCL** (it was wired G38 = yellow,
+  G39 = white). M5Stack's text says the base's plug has yellow = IO1, white = IO2, so for SDA = G5 and SCL = G6
+  the expected setting is **switch 5 on** (G5 into the IO1 group) and **switch 2 on** (G6 into the IO2 group), all
+  others off - to be confirmed on the real plug with the I2C scan.
+- So the firmware's DAC pins must move to two of G5-G8: `dac_sda_pin` / `dac_scl_pin` (defaults G38/G39 in
+  `dac_local.yml`; `FlowProportionalDampers.yaml` sets **G5 = SDA, G6 = SCL**).
+- **Unsettled:** which plug wire is IO1 and which is IO2. M5Stack's text says yellow = IO1, white = IO2, but the
+  schematic's connector pin order suggests the opposite. Settle it with a **live I2C scan** (expect 0x59 for the
+  DAC); if nothing is found, swap the two substitution values (or the two DIP switches).
+- **Verified with flying leads (2026-11-02):** SDA = GPIO5 (yellow lead), SCL = GPIO6 (white lead): the boot scan
+  finds the DAC at 0x59 and UC3 writes to it without errors. The S3R's internal bus (SDA 45 / SCL 0) holds the
+  LP5562 backlight chip (0x30) and the IMU (0x68), so G5/G6 are free. **The 5-pin bottom bank is, in order,
+  3V3, G5, G6, G7, G8 - the first pad is 3V3, not G5.** Putting the leads one pad out (yellow on 3V3, white on
+  G5) gave "no devices" in either firmware orientation.
+- Size 30.2 x 24.0 x 13.1 mm, one M2 screw. The base's pins need the S3R's bottom pads free, so the soldered pins
+  on the 4-pin bank have to be removed first.
 
 ## Power warning
 

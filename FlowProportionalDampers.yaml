@@ -16,6 +16,11 @@ substitutions:
   ota_password: !secret ota_password
   api_encryption_key: !secret api_encryption_key
   flash_size: 4MB
+  # DAC on the Atomic ToUnit Base's pins (the base routes only GPIO5-8 of the S3R's bottom pins; see
+  # docs/hardware-and-pitfalls.md). The DAC's data/clock leads go to GPIO5/GPIO6; if a live I2C scan finds nothing,
+  # swap these two values (the SDA/SCL colour order of the base is not settled by its documents).
+  dac_sda_pin: GPIO5
+  dac_scl_pin: GPIO6
 
 esphome:
   # Overrides the upstream project name set in base_local.yml; shown in the web page and the API.

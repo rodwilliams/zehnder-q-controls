@@ -1,13 +1,19 @@
 # GP8413 2-channel 15-bit I2C-to-0-10V DAC, wired separately from the CAN Grove port
 # (GPIO1/GPIO2 are already used by the CAN transceiver).
-# NOTE: SDA=GPIO38, SCL=GPIO39 - confirmed by live bus scan 2026-08-08. M5Stack's own docs
+# The I2C pins are the substitutions dac_sda_pin / dac_scl_pin; a top-level project file overrides them.
+# Default (UC1, soldered pins on the S3R's 4-pin bottom bank): SDA=GPIO38, SCL=GPIO39 - confirmed by live bus
+# scan 2026-08-08. For the Atomic ToUnit Base (docs/hardware-and-pitfalls.md) use two of GPIO5-8, e.g. 5 and 6. M5Stack's own docs
 # label these "SYS_SCL"/"SYS_SDA" in the opposite order, which sent this in circles for a while.
 # The bus has an id because the AtomS3R's LCD backlight chip lives on a second I2C bus
 # (display_atoms3r_*_local.yml); with two buses every device must name its bus.
+substitutions:
+  dac_sda_pin: GPIO38
+  dac_scl_pin: GPIO39
+
 i2c:
   - id: bus_dac
-    sda: GPIO38
-    scl: GPIO39
+    sda: ${dac_sda_pin}
+    scl: ${dac_scl_pin}
     frequency: 10kHz
     scan: true
 
